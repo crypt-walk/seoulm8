@@ -1,3 +1,8 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>SeoulM8</title><link rel="manifest" href="manifest.json"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="SeoulM8"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><link rel="apple-touch-icon" href="icon-180.png"><meta name="theme-color" content="#0f5e6e">
 <meta name="claude:viewport-fit-sides" content="cover">
 <style>
@@ -104,6 +109,33 @@ textarea{width:100%;min-height:70px}
 #pad{display:block;touch-action:none;cursor:crosshair}
 @media (prefers-reduced-motion:no-preference){.fc{transition:transform .15s}}
 @media (max-width:480px){.blk{grid-template-columns:52px 1fr auto}.fc .front{font-size:44px}}
+
+.wrap.wide{max-width:1180px}
+.tk{cursor:pointer;border-bottom:1px dotted var(--sea);padding-bottom:1px}
+.tk:hover,.tk:active{background:var(--sea-soft)}
+#wsheet{position:fixed;left:0;right:0;bottom:0;z-index:60;background:var(--surface);border-top:2px solid var(--sea);box-shadow:0 -8px 30px rgba(0,0,0,.18);padding:12px 16px calc(14px + env(safe-area-inset-bottom));max-height:55vh;overflow:auto;display:none}
+#wsheet.open{display:block}
+#wsheet>*{max-width:880px;margin-left:auto;margin-right:auto}
+.wsrow{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)}
+.drlist{max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:10px;margin-top:8px;position:relative}
+.drrow{display:grid;grid-template-columns:34px 40px 60px 1fr;gap:8px;align-items:center;width:100%;text-align:left;border:0;border-bottom:1px solid var(--line);background:none;padding:8px 10px;font:inherit;color:inherit;cursor:pointer}
+.drrow .n{font:600 12px var(--mono);color:var(--muted)}.drrow .t{font:12px var(--mono);color:var(--sea)}
+.drrow .b{height:6px;background:var(--sea-soft);border-radius:4px;overflow:hidden}.drrow .b i{display:block;height:100%;background:var(--sea)}
+.drrow .x{font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.drrow.on,.wtrow.on{background:var(--act-soft)}
+.drsent{padding:10px 0;border-bottom:1px solid var(--line)}
+.wtpick{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.wtstage{position:relative;background:#000;border-radius:12px;overflow:hidden}
+.wtstage video{display:block;width:100%;max-height:62vh;background:#000}
+.wtstage:fullscreen video{max-height:100vh;height:100vh}
+.wtsubs{position:absolute;left:0;right:0;bottom:56px;text-align:center;pointer-events:none;padding:0 4%}
+.wtsubs>div{display:block;width:fit-content;max-width:100%;margin-left:auto;margin-right:auto;pointer-events:auto;background:rgba(0,0,0,.62);color:#fff;border-radius:8px;padding:2px 12px;margin-top:4px}
+.wtsubs>div:empty{display:none}
+.wtko{font-size:clamp(20px,2.6vw,34px);font-weight:600;line-height:1.4}.wtko .tk{border-bottom-color:rgba(255,255,255,.5)}.wtko .tk:hover{background:rgba(255,255,255,.25)}
+.wten{font-size:clamp(14px,1.6vw,22px)}
+.wtrow{display:grid;grid-template-columns:52px 1fr;gap:10px;padding:8px 10px;border-bottom:1px solid var(--line)}
+.wtrow .t{border:0;background:none;font:12px var(--mono);color:var(--sea);cursor:pointer;text-align:left;padding:4px 0}
+.wtoff{padding:3px 9px;font-size:12px}
 </style>
 
 <header class="bar"><div class="bar-in">
@@ -113,6 +145,9 @@ textarea{width:100%;min-height:70px}
     <button data-v="lessons">Lessons</button>
     <button data-v="cards">Flashcards</button>
     <button data-v="quiz">Quiz</button>
+    <button data-v="drills">Drills</button>
+    <button data-v="watch">Watch</button>
+    <button data-v="words">Words</button>
     <button data-v="practise">Practise</button>
     <button data-v="notes">Notes</button>
     <button data-v="plan">Plan</button>
@@ -122,6 +157,7 @@ textarea{width:100%;min-height:70px}
 
 <main><div class="wrap" id="view"><p class="muted">Loading your course…</p></div></main>
 
+<script src="fsi.js"></script>
 <script>
 (function(){
 "use strict";
@@ -318,13 +354,14 @@ function allCards(){
     (L.jamo||[]).forEach(function(g){J[g].forEach(function(x){out.push({id:"j:"+x[0],front:x[0],rom:x[1],en:x[2],speak:x[3],lesson:L.id,kind:"letter"});});});
   });
   W.forEach(function(w){out.push({id:"w:"+w[0],front:w[0],rom:w[1],en:w[2],speak:w[0],lesson:w[3],kind:"word"});});
+  Object.keys(state.saved||{}).forEach(function(k){out.push({id:"s:"+k,front:k,rom:"",en:state.saved[k].en,speak:k,lesson:"saved",kind:"word"});});
   return out;
 }
 var CARDS=allCards();
 function unlockedLessons(){return LESSONS.filter(function(L){var s=state.lessons[L.id];return s&&(s.started||s.done);}).map(function(L){return L.id;});}
 function cardState(id){return state.cards[id];}
 function dueCards(){
-  var t=today(), un=unlockedLessons();
+  var t=today(), un=unlockedLessons().concat(["saved"]);
   var pool=CARDS.filter(function(c){return un.indexOf(c.lesson)>=0;});
   var due=pool.filter(function(c){var s=cardState(c.id);return s&&s.due<=t;});
   var newToday=Object.keys(state.cards).filter(function(k){return state.cards[k].first===t;}).length;
@@ -360,6 +397,11 @@ function render(){
   else if(current==="help") v.innerHTML=viewHelp();
   else if(current==="notes") {v.innerHTML=viewNotes(); bindNotes();}
   else if(current==="practise") {v.innerHTML=viewPractise(); bindPractise();}
+  else if(current==="drills") {v.innerHTML=viewDrills(); bindDrills();}
+  else if(current==="watch") {v.innerHTML=viewWatch(); bindWatch();}
+  else if(current==="words") {v.innerHTML=viewWords(); bindWords();}
+  v.classList.toggle("wide",current==="watch");
+  if(current!=="drills"&&typeof dr!=="undefined"&&dr.playing) drStop();
   bindCommon();
 }
 function lessonForToday(){var n=dayNum();var L=LESSONS.find(function(x){return x.day===n;});if(L)return L;var undone=LESSONS.find(function(x){return !(state.lessons[x.id]&&state.lessons[x.id].done);});return undone||null;}
@@ -367,11 +409,11 @@ function viewToday(){
   var n=dayNum(), L=lessonForToday(), d=dueCards(), t=today(), lg=state.log[t]||{blocks:{}};
   var blocks;
   if(L&&L.boat){
-    blocks=[["k1",15,"Vocab self-test","Boat Pack word list, both directions.",""],["k2",25,"Dialogue: "+L.title.replace(/^Boat day \d: /,""),"Read, listen with Speak Selection, shadow each line 3 times, learn your lines.","lesson"],["k3",20,"FSI audio","Downloaded drills, listen and repeat aloud.",""],["k4",15,"Written exercises","Boat Pack exercises, then check the answer key.",""],["k5",15,"Handwriting or video","Copy the dialogue, or watch a downloaded lesson.",""]];
+    blocks=[["k1",15,"Vocab self-test","Boat Pack word list, both directions.",""],["k2",25,"Dialogue: "+L.title.replace(/^Boat day \d: /,""),"Read, listen with Speak Selection, shadow each line 3 times, learn your lines.","lesson"],["k3",20,"FSI audio","Open Drills, pick the unit, and repeat every phrase aloud.","drills"],["k4",15,"Written exercises","Boat Pack exercises, then check the answer key.",""],["k5",15,"Handwriting or video","Copy the dialogue, or watch a downloaded lesson.",""]];
   } else if(L&&L.light){
     blocks=[["r1",10,"Re-read the boat dialogues","Aloud, once each.","lesson"],["r2",10,"Flashcards","Whatever is due.","cards"]];
   } else if(n>=8){
-    blocks=[["b1",10,"Flashcards","Review "+d.due.length+" due and "+d.fresh.length+" new cards, saying each aloud.","cards"],["b2",20,L?("Lesson: "+L.title):"Lesson","Video, notes, and the drill out loud.","lesson"],["b3",15,"FSI audio",L&&L.fsi?L.fsi:"Listen and repeat.",""],["b4",10,"Role-play",L&&L.rp?L.rp.title:"Free conversation","practise"],["b5",5,"Quiz","One quick quiz.","quiz"]];
+    blocks=[["b1",10,"Flashcards","Review "+d.due.length+" due and "+d.fresh.length+" new cards, saying each aloud.","cards"],["b2",20,L?("Lesson: "+L.title):"Lesson","Video, notes, and the drill out loud.","lesson"],["b3",15,"FSI audio",L&&L.fsi?L.fsi:"Listen and repeat.","drills"],["b4",10,"Role-play",L&&L.rp?L.rp.title:"Free conversation","practise"],["b5",5,"Quiz","One quick quiz.","quiz"]];
   } else {
     blocks=[["b1",10,"Flashcards","Review "+d.due.length+" due and "+d.fresh.length+" new cards, saying each one aloud.","cards"],["b2",L&&L.tutor?20:25,L?("Lesson: "+L.title):"Lesson","Watch one of the linked videos, read the notes, and say the drill aloud.","lesson"],["b3",10,"Shadowing","Play each drill item, then repeat it straight after, copying the rhythm. Do slow speed first, then normal.","lesson"],["b4",10,"Quiz","One 10-question quiz on everything you've unlocked so far.","quiz"],["b5",5,"Write by hand","Copy today's letters or words onto paper 5 times each.",""]];
   }
@@ -531,6 +573,8 @@ function mergeState(s){
   Object.keys(s.log||{}).forEach(function(d){var a=state.log[d]||{mins:0,blocks:{}},b=s.log[d]||{};var bl=Object.assign({},a.blocks||{});Object.keys(b.blocks||{}).forEach(function(k){bl[k]=bl[k]||b.blocks[k];});state.log[d]={mins:Math.max(a.mins||0,b.mins||0),blocks:bl};});
   var seen={};state.quizzes=(state.quizzes||[]).concat(s.quizzes||[]).filter(function(q){var k=JSON.stringify(q);if(seen[k])return false;seen[k]=1;return true;});
   if(s.checkin&&!state.checkin)state.checkin=s.checkin;
+  if(s.saved){state.saved=state.saved||{};Object.keys(s.saved).forEach(function(k){if(!state.saved[k])state.saved[k]=s.saved[k];});CARDS=allCards();}
+  if(s.fsi&&!state.fsi)state.fsi=s.fsi;
 }
 function bindCommon(){
   document.querySelectorAll("[data-say]").forEach(function(b){b.onclick=function(e){e.stopPropagation();say(b.dataset.say,false);};});
@@ -775,6 +819,323 @@ function bindPractise(){
   }
 }
 (async function(){ try{ if(window.claude&&claude.use){ sampleFn=await claude.use("sample"); } }catch(e){} sampleReady=true; if(current==="practise") render(); })();
+
+// ---------- EXTRAS: local storage for audio and subtitles ----------
+var FSI=(window.FSI&&window.FSI.units)||[];
+var idb=null;
+function idbOpen(){return new Promise(function(res){if(idb)return res(idb);try{var r=indexedDB.open("seoulm8",1);r.onupgradeneeded=function(){var d=r.result;if(!d.objectStoreNames.contains("audio"))d.createObjectStore("audio");if(!d.objectStoreNames.contains("kv"))d.createObjectStore("kv");};r.onsuccess=function(){idb=r.result;res(idb);};r.onerror=function(){res(null);};}catch(e){res(null);}});}
+function idbGet(st,k){return idbOpen().then(function(d){return new Promise(function(res){if(!d)return res(null);try{var q=d.transaction(st).objectStore(st).get(k);q.onsuccess=function(){res(q.result==null?null:q.result);};q.onerror=function(){res(null);};}catch(e){res(null);}});});}
+function idbSet(st,k,v){return idbOpen().then(function(d){return new Promise(function(res){if(!d)return res(false);try{var tx=d.transaction(st,"readwrite");tx.objectStore(st).put(v,k);tx.oncomplete=function(){res(true);};tx.onerror=function(){res(false);};tx.onabort=function(){res(false);};}catch(e){res(false);}});});}
+function idbDel(st,k){return idbOpen().then(function(d){return new Promise(function(res){if(!d)return res(false);try{var tx=d.transaction(st,"readwrite");tx.objectStore(st).delete(k);tx.oncomplete=function(){res(true);};tx.onerror=function(){res(false);};}catch(e){res(false);}});});}
+
+// ---------- EXTRAS: word lookup ----------
+var DICT=null, dictLoading=null, GLOSS={};
+W.forEach(function(w){GLOSS[w[0]]=w[2];});
+FSI.forEach(function(u){u.v.forEach(function(v){GLOSS[v[0]]=v[2];});});
+function loadDict(){if(DICT)return Promise.resolve(DICT);if(!dictLoading)dictLoading=fetch("dict.json").then(function(r){if(!r.ok)throw 0;return r.json();}).then(function(j){DICT=j;return j;}).catch(function(){dictLoading=null;return {};});return dictLoading;}
+function decomp(ch){var c=ch.charCodeAt(0)-0xAC00;if(c<0||c>11171)return null;return [Math.floor(c/588),Math.floor((c%588)/28),c%28];}
+function comp(a,b,c){return String.fromCharCode(0xAC00+a*588+b*28+c);}
+var PARTICLES=["에서는","에게서","한테서","으로는","이라고","에서도","에게는","까지","부터","에서","에게","한테","께서","으로","처럼","보다","마다","이나","이랑","하고","라고","에는","에도","은","는","이","가","을","를","에","의","도","만","와","과","로","나","랑","요","야","께","들"];
+var COPULA=["이었습니다","였습니다","입니다","입니까","이에요","이어요","예요","이었어요","였어요","이지요","이죠","인데요","인데","이고","이라서","이니까","이면","이다","인"];
+var VEND=["겠습니다","겠습니까","었습니다","았습니다","였습니다","었습니까","았습니까","였습니까","습니다","습니까","으십시오","십시오","으세요","세요","었어요","았어요","였어요","겠어요","어요","아요","여요","는데요","은데요","네요","군요","지요","거든요","잖아요","을까요","ㄹ까요","을게요","는데","은데","지만","으니까","니까","으면","어서","아서","여서","으려고","려고","으러","어도","아도","어야","아야","면서","다가","도록","거나","는지","을까","ㄹ까","죠","면","고","게","지","기","는","은","을","던","다","자","어","아","여","요","서","러","니","나","네"];
+function expandStem(s,acc,depth){
+  if(!s||depth>3)return; acc.push(s);
+  ["으셨","으시","셨","시","겠","었","았","였"].forEach(function(p){if(s.length>p.length&&s.slice(-p.length)===p)expandStem(s.slice(0,-p.length),acc,depth+1);});
+  var last=s.slice(-1),d=decomp(last),head=s.slice(0,-1),p;
+  if(!d)return;
+  if(d[2]===20){expandStem(head+comp(d[0],d[1],0),acc,depth+1);return;}
+  if(d[2]===0){
+    if(d[0]===18&&d[1]===1)acc.push(head+"하");
+    if(d[1]===9)acc.push(head+comp(d[0],8,0));
+    if(d[1]===14)acc.push(head+comp(d[0],13,0));
+    if(d[1]===6)acc.push(head+comp(d[0],20,0));
+    if(d[1]===10)acc.push(head+comp(d[0],11,0));
+    if(d[1]===0||d[1]===4)acc.push(head+comp(d[0],18,0));
+    if((last==="워"||last==="와"||last==="우")&&head){p=decomp(head.slice(-1));if(p&&p[2]===0)acc.push(head.slice(0,-1)+comp(p[0],p[1],17));}
+    if(d[0]===5&&(d[1]===0||d[1]===4)&&head){p=decomp(head.slice(-1));if(p&&p[2]===8)acc.push(head.slice(0,-1)+comp(p[0],p[1],0)+"르");}
+  }
+}
+function lemmaCands(w){
+  var out=[],seen={};function push(s){if(s&&!seen[s]){seen[s]=1;out.push(s);}}
+  push(w);
+  COPULA.forEach(function(p){if(w.length>p.length&&w.slice(-p.length)===p)push(w.slice(0,-p.length));});
+  PARTICLES.forEach(function(p){if(w.length>p.length&&w.slice(-p.length)===p)push(w.slice(0,-p.length));});
+  var stems=[w],m=/^(.+)(니다|니까|시다)$/.exec(w),d;
+  if(m){d=decomp(m[1].slice(-1));if(d&&d[2]===17)stems.push(m[1].slice(0,-1)+comp(d[0],d[1],0));}
+  VEND.forEach(function(e){if(w.length>e.length&&w.slice(-e.length)===e){var st=w.slice(0,-e.length);stems.push(st);var c=e.charAt(0);if(c==="어"||c==="아"||c==="으"){var q=decomp(st.slice(-1));if(q&&q[2]===8)stems.push(st.slice(0,-1)+comp(q[0],q[1],7));}}});
+  var all=[];stems.forEach(function(s){expandStem(s,all,0);});
+  all.forEach(function(s){push(s+"다");var q=decomp(s.slice(-1));if(q&&q[2]===0)push(s.slice(0,-1)+comp(q[0],q[1],8)+"다");});
+  return out;
+}
+function lookupWord(w){
+  var res=[],seen={},dict=DICT||{};
+  function add(k){if(seen[k])return;var g=GLOSS[k]||dict[k];if(g){seen[k]=1;res.push({w:k,en:g});}}
+  lemmaCands(w).forEach(add);
+  if(!res.length){for(var n=Math.min(w.length-1,5);n>=2;n--){add(w.slice(0,n));if(res.length)break;}}
+  return res.slice(0,5);
+}
+function cleanTok(t){return t.replace(/[^가-힣ㄱ-ㅎㅏ-ㅣ]/g,"");}
+function tokHtml(text){return String(text).split(/(\s+)/).map(function(t){if(/^\s*$/.test(t))return t;var c=cleanTok(t);return c?'<span class="tk" data-w="'+esc(c)+'">'+esc(t)+'</span>':esc(t);}).join("");}
+function savedMap(){state.saved=state.saved||{};return state.saved;}
+function refreshCards(){CARDS=allCards();}
+function saveWord(ko,en,ctx,src){savedMap()[ko]={en:en,ctx:(ctx||"").slice(0,160),src:src||"",d:today()};refreshCards();persist();}
+function ensureSheet(){var s=el("wsheet");if(s)return s;s=document.createElement("div");s.id="wsheet";s.setAttribute("role","dialog");s.setAttribute("aria-label","Word lookup");document.body.appendChild(s);return s;}
+function closeSheet(){var s=el("wsheet");if(s){s.classList.remove("open");s.innerHTML="";}}
+function showWord(w,ctx,src){
+  var s=ensureSheet();
+  function paint(){
+    var res=lookupWord(w),sv=savedMap();
+    var h='<div class="row" style="justify-content:space-between"><div class="row"><span class="ko" style="font-size:24px;font-weight:700">'+esc(w)+'</span><button class="btn ghost" style="padding:6px 10px;font-size:12px" data-say="'+esc(w)+'">▶</button></div><button class="btn ghost" id="wsClose" style="padding:6px 10px;font-size:12px">Close</button></div>';
+    if(ctx)h+='<div class="small muted ko" style="margin:2px 0 6px">'+esc(ctx)+'</div>';
+    if(!DICT)h+='<div class="small muted">Loading dictionary…</div>';
+    res.forEach(function(r,i){h+='<div class="wsrow"><div><b class="ko">'+esc(r.w)+'</b><div class="small">'+esc(r.en)+'</div></div><button class="btn'+(sv[r.w]?' ghost':'')+'" style="padding:7px 10px;font-size:12px" data-wsave="'+i+'">'+(sv[r.w]?'Saved ✓':'Save')+'</button></div>';});
+    if(DICT&&!res.length)h+='<div class="small muted">Not in the offline dictionary. Add your own meaning to save it.</div>';
+    h+='<div class="row" style="margin-top:6px"><input id="wsOwn" placeholder="Your own meaning" style="flex:1;min-width:120px;padding:8px;border:1px solid var(--line);border-radius:8px;font:inherit"><button class="btn ghost" id="wsOwnSave" style="padding:7px 10px;font-size:12px">Save as typed</button></div>';
+    s.innerHTML=h;s.classList.add("open");
+    el("wsClose").onclick=closeSheet;
+    s.querySelectorAll("[data-say]").forEach(function(b){b.onclick=function(){say(b.dataset.say);};});
+    s.querySelectorAll("[data-wsave]").forEach(function(b){b.onclick=function(){var r=res[+b.dataset.wsave];saveWord(r.w,r.en,ctx,src);b.textContent="Saved ✓";b.classList.add("ghost");};});
+    el("wsOwnSave").onclick=function(){var v=(el("wsOwn").value||"").trim();if(!v)return;saveWord(res.length?res[0].w:w,v,ctx,src);el("wsOwnSave").textContent="Saved ✓";};
+  }
+  paint(); if(!DICT)loadDict().then(function(j){if(!DICT)DICT=j;if(s.classList.contains("open"))paint();});
+}
+document.addEventListener("click",function(e){var t=e.target;if(t&&t.classList&&t.classList.contains("tk")){e.stopPropagation();var c=t.closest("[data-ctx]");if(current==="watch"&&wt.videoEl&&!wt.videoEl.paused){try{wt.videoEl.pause();}catch(x){}}showWord(t.dataset.w,c?c.dataset.ctx:"",c?c.dataset.src||"":"");}});
+
+// ---------- EXTRAS: saved words ----------
+function viewWords(){
+  var sv=savedMap(),keys=Object.keys(sv).sort(function(a,b){return (sv[b].d||"")<(sv[a].d||"")?-1:1;});
+  var h='<span class="eyebrow">From drills and videos</span><h1>My words</h1><p class="muted">Tap any Korean word in a drill sentence or a subtitle to look it up and save it. Saved words join your flashcards automatically.</p>';
+  if(!keys.length)return h+'<div class="note">Nothing saved yet.</div>';
+  h+='<div class="row"><span class="pill sea">'+keys.length+' saved</span><button class="btn ghost" id="wdCopy" style="padding:7px 10px;font-size:12px">Copy list</button><span class="small muted" id="wdMsg"></span></div><div class="card">';
+  keys.forEach(function(k){var x=sv[k];h+='<div class="wsrow"><div><button class="w" style="text-align:left;align-items:flex-start" data-say="'+esc(k)+'"><span class="k">'+esc(k)+'</span></button><div class="small">'+esc(x.en)+'</div>'+(x.ctx?'<div class="small muted ko">'+esc(x.ctx)+'</div>':'')+'</div><button class="btn ghost" style="padding:6px 9px;font-size:12px" data-wdel="'+esc(k)+'" aria-label="Remove '+esc(k)+'">Remove</button></div>';});
+  return h+'</div>';
+}
+function bindWords(){
+  document.querySelectorAll("[data-wdel]").forEach(function(b){b.onclick=function(){delete savedMap()[b.dataset.wdel];delete state.cards["s:"+b.dataset.wdel];refreshCards();persist();render();};});
+  var c=el("wdCopy");if(c)c.onclick=function(){var sv=savedMap(),s=Object.keys(sv).map(function(k){return k+"\t"+sv[k].en;}).join("\n");try{navigator.clipboard.writeText(s).then(function(){el("wdMsg").textContent="Copied ✓";}).catch(function(){});}catch(e){}};
+}
+
+// ---------- EXTRAS: FSI drills ----------
+var dr={key:null,tapes:null,segs:[],i:0,mode:"echo",reps:1,rate:1,playing:false,tick:null,gapT:null,repLeft:0,busy:"",guard:0,url:null,turn:false};
+var drAudio=null;
+function fsiState(){state.fsi=state.fsi||{pos:{},links:{},stars:{},hideEn:false};state.fsi.pos=state.fsi.pos||{};state.fsi.links=state.fsi.links||{};state.fsi.stars=state.fsi.stars||{};return state.fsi;}
+function tapeInfo(name){var m=/Unit\s*0*(\d+)(?:\s*Tape\s*(\d+))?/i.exec(name),v=/Volume\s*(\d+)/i.exec(name);if(!m)return {key:"x:"+name,label:name.replace(/\.[a-z0-9]+$/i,""),unit:0,vol:0,tape:0};var vol=v?+v[1]:1,u=+m[1],t=m[2]?+m[2]:0;return {key:"v"+vol+"u"+u+"t"+t,label:(vol>1?"Vol "+vol+" · ":"")+"Unit "+u+(t?" · Tape "+t:""),unit:u,vol:vol,tape:t};}
+function tapeList(){return Object.keys(dr.tapes||{}).map(function(k){return dr.tapes[k];}).sort(function(a,b){return (a.vol-b.vol)||(a.unit-b.unit)||(a.tape-b.tape);});}
+function fmtT(t){t=Math.max(0,Math.floor(t));return Math.floor(t/60)+":"+("0"+(t%60)).slice(-2);}
+function mp3Frames(u8){
+  var n=u8.length,i=0;
+  if(n>10&&u8[0]===0x49&&u8[1]===0x44&&u8[2]===0x33)i=10+(((u8[6]&127)<<21)|((u8[7]&127)<<14)|((u8[8]&127)<<7)|(u8[9]&127));
+  var BR1=[0,32,40,48,56,64,80,96,112,128,160,192,224,256,320],BR2=[0,8,16,24,32,40,48,56,64,80,96,112,128,144,160],SR={3:[44100,48000,32000],2:[22050,24000,16000],0:[11025,12000,8000]};
+  function hdr(p){if(p+4>n||u8[p]!==0xFF||(u8[p+1]&0xE0)!==0xE0)return null;var ver=(u8[p+1]>>3)&3,layer=(u8[p+1]>>1)&3;if(ver===1||layer!==1)return null;var bi=u8[p+2]>>4,si=(u8[p+2]>>2)&3,pad=(u8[p+2]>>1)&1;if(bi===0||bi===15||si===3)return null;var br=(ver===3?BR1:BR2)[bi]*1000,sr=SR[ver][si],spf=ver===3?1152:576;return {len:Math.floor((spf/8)*br/sr)+pad,sr:sr,spf:spf};}
+  function sync(p,lim){for(var e=Math.min(n-4,p+lim);p<e;p++){var h=hdr(p);if(h&&h.len>20){var h2=hdr(p+h.len);if(h2&&h2.sr===h.sr)return p;}}return -1;}
+  var p=sync(i,200000);if(p<0)return null;
+  var offs=[],first=hdr(p),h;
+  while(p<n-4){h=hdr(p);if(!h||h.sr!==first.sr){var q=sync(p+1,4000);if(q<0)break;p=q;continue;}offs.push(p);p+=h.len;}
+  return {offs:offs,sr:first.sr,spf:first.spf,end:Math.min(p,n)};
+}
+function segmentEnv(env,hop,dur){
+  var n=env.length,i;if(!n)return [];
+  var sm=new Float32Array(n);for(i=0;i<n;i++){sm[i]=((env[i-1]||0)+(env[i]||0)+(env[i+1]||0))/3;}
+  var sorted=Array.prototype.slice.call(sm).sort(function(a,b){return a-b;});
+  var floor=sorted[Math.floor(n*0.15)],loud=sorted[Math.floor(n*0.95)],thr=floor+(loud-floor)*0.12;
+  var gap=Math.round(0.42/hop),raw=[],on=false,st=0,last=0;
+  for(i=0;i<n;i++){if(sm[i]>thr){if(!on){on=true;st=i;}last=i;}else if(on&&i-last>gap){raw.push([st,last]);on=false;}}
+  if(on)raw.push([st,last]);
+  var segs=[],prevEnd=0;
+  raw.forEach(function(r){if((r[1]-r[0]+1)*hop<0.25)return;var s=Math.max(prevEnd,r[0]*hop-0.12),e=(r[1]+1)*hop+0.18;segs.push([Math.round(s*100)/100,Math.round(e*100)/100]);prevEnd=e;});
+  if(segs.length<3&&dur>20){segs=[];for(var t=0;t<dur;t+=6)segs.push([t,Math.min(dur,t+6)]);}
+  return segs;
+}
+function analyzeAudio(blob,onp){
+  var hop=0.02,env=[],C=window.OfflineAudioContext||window.webkitOfflineAudioContext,ctx=null;
+  [8000,16000,22050,44100].some(function(r){try{ctx=new C(1,r,r);return true;}catch(e){return false;}});
+  if(!ctx)return Promise.resolve({segs:[],dur:0});
+  function dec(buf){return new Promise(function(res,rej){try{var p=ctx.decodeAudioData(buf,res,rej);if(p&&p.catch)p.catch(rej);}catch(e){rej(e);}});}
+  function addEnv(ch,sr,t0){var w=Math.round(sr*hop),base=Math.round(t0/hop);for(var k=0,c=0;k+w<=ch.length;k+=w,c++){var s=0;for(var j=k;j<k+w;j++)s+=ch[j]*ch[j];env[base+c]=Math.sqrt(s/w);}}
+  return blob.arrayBuffer().then(function(ab){
+    var fr=null;try{fr=mp3Frames(new Uint8Array(ab));}catch(e){}
+    if(fr&&fr.offs.length>50){
+      var fps=fr.sr/fr.spf,per=Math.round(fps*150),total=fr.offs.length,dur=total/fps,a=0;
+      var step=function(){if(a>=total)return Promise.resolve();var b=Math.min(total,a+per),t0=a/fps,sl=ab.slice(fr.offs[a],b<total?fr.offs[b]:fr.end);a=b;return dec(sl).then(function(au){addEnv(au.getChannelData(0),au.sampleRate,t0);},function(){}).then(function(){if(onp)onp(a/total);return new Promise(function(r){setTimeout(r,0);});}).then(step);};
+      return step().then(function(){for(var i=0;i<env.length;i++)if(env[i]===undefined)env[i]=0;return {segs:segmentEnv(env,hop,dur),dur:dur};});
+    }
+    return dec(ab.slice(0)).then(function(au){addEnv(au.getChannelData(0),au.sampleRate,0);return {segs:segmentEnv(env,hop,au.duration),dur:au.duration};},function(){return {segs:[],dur:0};});
+  });
+}
+function drInit(){if(dr.tapes)return Promise.resolve();return idbGet("kv","tapes").then(function(t){dr.tapes=t||{};var f=fsiState();if(!dr.key){var l=tapeList();if(f.last&&dr.tapes[f.last])dr.key=f.last;else if(l.length)dr.key=l[0].key;}if(dr.key)return drLoad(dr.key,true);});}
+function drLoad(key,quiet){
+  drStop();dr.key=key;dr.segs=[];
+  return Promise.all([idbGet("audio",key),idbGet("kv","seg:"+key)]).then(function(r){
+    if(!r[0]){dr.segs=[];return;}
+    if(!drAudio){drAudio=new Audio();drAudio.preload="auto";drAudio.addEventListener("ended",function(){drStop();drPaint();});}
+    if(dr.url){try{URL.revokeObjectURL(dr.url);}catch(e){}}
+    dr.url=URL.createObjectURL(r[0]);drAudio.src=dr.url;
+    dr.segs=r[1]||[];var f=fsiState();f.last=key;dr.i=Math.min(f.pos[key]||0,Math.max(0,dr.segs.length-1));
+  });
+}
+function drImport(files){
+  var list=Array.prototype.slice.call(files),k=0;
+  var next=function(){
+    if(k>=list.length){dr.busy="";return idbSet("kv","tapes",dr.tapes).then(function(){if(!dr.key||!dr.tapes[dr.key]){var l=tapeList();if(l.length)return drLoad(l[0].key);}else return drLoad(dr.key);}).then(function(){if(current==="drills")render();});}
+    var f=list[k++],info=tapeInfo(f.name);
+    dr.busy="Adding "+info.label+" ("+k+" of "+list.length+")…";drBusyPaint();
+    var blob=null;
+    return f.arrayBuffer().then(function(ab){blob=new Blob([ab],{type:f.type||"audio/mpeg"});return idbSet("audio",info.key,blob);},function(){return false;}).then(function(ok){
+      if(!ok){dr.busy="Couldn't store "+f.name+". Free up some space and try again.";drBusyPaint();return;}
+      return analyzeAudio(blob,function(p){dr.busy="Finding phrases in "+info.label+": "+Math.round(p*100)+"%";drBusyPaint();}).then(function(r){info.name=f.name;info.dur=r.dur;info.n=r.segs.length;dr.tapes[info.key]=info;return idbSet("kv","seg:"+info.key,r.segs);});
+    }).then(next);
+  };
+  return next();
+}
+function drBusyPaint(){var b=el("drBusy");if(b)b.textContent=dr.busy;}
+function drUnitData(){var t=dr.tapes&&dr.tapes[dr.key];if(!t||t.vol!==1)return null;return FSI.filter(function(u){return u.n===t.unit;})[0]||null;}
+function drLinks(){var f=fsiState();f.links[dr.key]=f.links[dr.key]||{};return f.links[dr.key];}
+function drSegSent(i){var L=drLinks(),u=drUnitData();if(!u)return null;for(var k in L){if(L[k]===i){var s=u.s.filter(function(x){return String(x[0])===String(k);})[0];if(s)return s;}}return null;}
+function drSeek(t){dr.guard=Date.now()+350;var go=function(){try{drAudio.currentTime=t;}catch(e){}};if(drAudio.readyState>=1)go();else drAudio.addEventListener("loadedmetadata",go,{once:true});try{drAudio.playbackRate=dr.rate;}catch(e){}var p=drAudio.play();if(p&&p.catch)p.catch(function(){});}
+function drPlay(i,keepReps){
+  if(!dr.segs.length||!drAudio)return;
+  clearTimeout(dr.gapT);dr.turn=false;dr.i=Math.max(0,Math.min(dr.segs.length-1,i));if(!keepReps)dr.repLeft=dr.reps;
+  dr.playing=true;drSeek(dr.segs[dr.i][0]);
+  clearInterval(dr.tick);dr.tick=setInterval(drTick,40);drPaint();
+}
+function drTick(){
+  if(!dr.playing||dr.turn)return;var t=drAudio.currentTime,seg=dr.segs[dr.i];if(!seg)return;
+  if(Date.now()<dr.guard&&(t<seg[0]-0.5||t>=seg[1]))return;
+  if(t<seg[1])return;
+  if(dr.mode==="listen"){if(dr.i>=dr.segs.length-1){drStop();drPaint();return;}while(dr.i<dr.segs.length-1&&t>=dr.segs[dr.i][1])dr.i++;drPaint();return;}
+  if(dr.mode==="loop"){drSeek(seg[0]);return;}
+  drAudio.pause();dr.turn=true;drPaint();
+  var gap=((seg[1]-seg[0])/dr.rate)*1.15+0.7;
+  dr.gapT=setTimeout(function(){dr.turn=false;if(!dr.playing)return;dr.repLeft--;if(dr.repLeft>0)drPlay(dr.i,true);else if(dr.i<dr.segs.length-1)drPlay(dr.i+1);else{drStop();drPaint();}},gap*1000);
+}
+function drStop(){dr.playing=false;dr.turn=false;clearInterval(dr.tick);clearTimeout(dr.gapT);if(drAudio){try{drAudio.pause();}catch(e){}}if(dr.key&&dr.segs.length){var f0=fsiState();if(f0.pos[dr.key]!==dr.i){f0.pos[dr.key]=dr.i;persist();}}}
+function drPaint(){
+  var now=el("drNow");if(!now)return;var seg=dr.segs[dr.i],s=drSegSent(dr.i),f=fsiState();
+  var h='<div class="small muted">Phrase '+(dr.segs.length?dr.i+1:0)+' of '+dr.segs.length+(seg?' · '+fmtT(seg[0]):'')+(dr.turn?' · <b style="color:var(--act)">Your turn: say it aloud</b>':'')+'</div>';
+  if(s)h+='<div class="ko" style="font-size:22px;font-weight:700;line-height:1.35" data-ctx="'+esc(s[2])+'" data-src="FSI">'+tokHtml(s[2])+'</div><div class="small" style="font-family:var(--mono);color:var(--sea)">'+esc(s[3])+'</div>'+(f.hideEn?'':'<div class="small">'+esc(s[4])+'</div>');
+  else h+='<div class="small muted">No sentence linked to this phrase. Play it, then tap <b>Link</b> on the matching sentence below.</div>';
+  now.innerHTML=h;
+  var pb=el("drPlayBtn");if(pb)pb.textContent=dr.playing?"⏸ Pause":"▶ Play";
+  var bar=el("drBar");if(bar)bar.style.width=(dr.segs.length?Math.round((dr.i+1)/dr.segs.length*100):0)+"%";
+  var list=el("drList");if(list){var cur=list.querySelector(".on");if(cur)cur.classList.remove("on");var row=list.querySelector('[data-seg="'+dr.i+'"]');if(row){row.classList.add("on");var top=row.offsetTop-list.offsetTop;if(top<list.scrollTop||top>list.scrollTop+list.clientHeight-40)list.scrollTop=Math.max(0,top-60);}}
+}
+function viewDrills(){
+  var h='<span class="eyebrow">FSI Korean Basic Course · offline</span><h1>Drills</h1>';
+  if(!dr.tapes)return h+'<p class="muted">Loading…</p>';
+  var list=tapeList(),f=fsiState();
+  h+='<div class="note small" id="drBusy" style="'+(dr.busy?'':'display:none')+'">'+esc(dr.busy)+'</div>';
+  if(!list.length){
+    h+='<div class="card next"><h3>Add the FSI audio once</h3><p>Pick the FSI MP3 files from your Google Drive folder (Volume 1). Units 1 to 3 have full text here; any other tape still works for phrase-by-phrase drilling.</p><ol class="small"><li>Tap the button and choose <b>Browse</b> or <b>Choose files</b>.</li><li>On iPhone, open <b>Google Drive</b> in the Files picker. If it isn\'t listed, tap the ⋯ menu → Edit and switch Drive on, or first save the MP3s to On My iPhone.</li><li>Select Unit 01, Unit 02 and Unit 03, then wait while the app finds the phrases. Keep the app open.</li></ol><input type="file" id="drFiles" accept="audio/*,.mp3" multiple><p class="small muted">The audio is copied into this app on this device, so it plays with no internet.</p></div>';
+    return h;
+  }
+  h+='<div class="row"><label for="drSel" class="small"><b>Tape</b></label><select id="drSel">'+list.map(function(t){return '<option value="'+esc(t.key)+'"'+(t.key===dr.key?' selected':'')+'>'+esc(t.label)+(t.n?' ('+t.n+' phrases)':'')+'</option>';}).join("")+'</select></div>';
+  var u=drUnitData(),t=dr.tapes[dr.key];
+  if(u)h+='<p class="muted">'+esc(u.title)+' <span class="ko">'+esc(u.ko)+'</span>. '+esc(u.intro)+'</p>';
+  h+='<div class="card next"><div id="drNow" style="min-height:74px"></div><div class="bar-prog"><i id="drBar" style="width:0%"></i></div>';
+  h+='<div class="row" style="justify-content:center"><button class="btn ghost" id="drPrev" aria-label="Previous phrase">⏮</button><button class="btn ghost" id="drAgain" aria-label="Play phrase again">↺ Again</button><button class="btn red" id="drPlayBtn" style="min-width:104px">▶ Play</button><button class="btn ghost" id="drNext" aria-label="Next phrase">⏭</button></div>';
+  h+='<div class="row small"><b>Mode</b>'+[["echo","Repeat after it"],["listen","Just listen"],["loop","Loop phrase"]].map(function(m){return '<button class="btn'+(dr.mode===m[0]?'':' ghost')+'" style="padding:6px 10px;font-size:12px" data-drmode="'+m[0]+'">'+m[1]+'</button>';}).join("")+'</div>';
+  h+='<div class="row small"><b>Each phrase</b>'+[1,2,3].map(function(n){return '<button class="btn'+(dr.reps===n?'':' ghost')+'" style="padding:6px 10px;font-size:12px" data-drreps="'+n+'">'+n+'×</button>';}).join("")+'<b style="margin-left:8px">Speed</b>'+[0.75,1].map(function(r){return '<button class="btn'+(dr.rate===r?'':' ghost')+'" style="padding:6px 10px;font-size:12px" data-drrate="'+r+'">'+(r===1?'Normal':'Slow')+'</button>';}).join("")+'</div>';
+  if(u)h+='<div class="row small"><label for="drLinkSel"><b>This phrase is</b></label><select id="drLinkSel" style="max-width:100%"><option value="">sentence… (choose to link)</option>'+u.s.map(function(s){return '<option value="'+s[0]+'">'+s[0]+' · '+esc(s[2])+'</option>';}).join("")+'</select></div>';
+  if(dr.mode==="echo")h+='<p class="small muted">The tape pauses after every phrase for about as long as the phrase lasted. Say it aloud in the gap.</p>';
+  if(!dr.segs.length)h+='<div class="note small">No phrases were found in this file. Remove it below and add it again.</div>';
+  var L=drLinks(),rev={};Object.keys(L).forEach(function(k){rev[L[k]]=k;});var st=f.stars[dr.key]||{};
+  h+='<details'+(u?'':' open')+'><summary class="small"><b>All phrases on this tape</b></summary><div id="drList" class="drlist">'+dr.segs.map(function(s,i){var sent=rev[i]!==undefined&&u?u.s.filter(function(x){return String(x[0])===String(rev[i]);})[0]:null;return '<button class="drrow'+(i===dr.i?' on':'')+'" data-seg="'+i+'"><span class="n">'+(i+1)+'</span><span class="t">'+fmtT(s[0])+'</span><span class="b"><i style="width:'+Math.min(100,Math.round((s[1]-s[0])*12))+'%"></i></span><span class="x ko">'+(st[i]?'★ ':'')+(sent?esc(sent[2]):'')+'</span></button>';}).join("")+'</div></details>';
+  h+='<div class="row"><button class="btn ghost" id="drStar" style="padding:6px 10px;font-size:12px">★ Star this phrase</button></div></div>';
+  if(u){
+    h+='<div class="card"><div class="row" style="justify-content:space-between"><h3>Sentences in Unit '+u.n+'</h3><label class="small"><input type="checkbox" id="drHideEn"'+(f.hideEn?' checked':'')+'> Hide English</label></div><p class="small muted">Tap a word to look it up and save it. <b>Voice</b> reads the sentence with the phone\'s Korean voice. <b>Link</b> ties a sentence to the phrase now selected in the player, so next time the text appears as the tape plays and <b>Tape</b> jumps straight to it.</p>';
+    u.s.forEach(function(s){var lk=L[s[0]];h+='<div class="drsent" data-ctx="'+esc(s[2])+'" data-src="FSI Unit '+u.n+'"><div class="small muted">'+s[0]+(s[1]?' · <span class="ko">'+esc(s[1])+'</span>':'')+'</div><div class="ko" style="font-size:19px;font-weight:600;line-height:1.4">'+tokHtml(s[2])+'</div><div class="small" style="font-family:var(--mono);color:var(--sea)">'+esc(s[3])+'</div>'+(f.hideEn?'':'<div class="small">'+esc(s[4])+'</div>')+(s[5]?'<div class="small muted">Note: '+esc(s[5])+'</div>':'')+'<div class="row" style="margin-top:4px"><button class="btn ghost" style="padding:5px 9px;font-size:12px" data-say="'+esc(s[2])+'">▶ Voice</button>'+(lk!==undefined?'<button class="btn ghost" style="padding:5px 9px;font-size:12px" data-drtape="'+lk+'">▶ Tape</button>':'')+'<button class="btn ghost" style="padding:5px 9px;font-size:12px" data-drlink="'+s[0]+'">'+(lk!==undefined?'Relink':'Link')+'</button></div></div>';});
+    h+='<p class="small muted">The tape also runs substitution and response drills after the dialogue. Their text isn\'t included yet; drill those by ear.</p></div>';
+  } else if(t){h+='<div class="note small">The text for '+esc(t.label)+' isn\'t added yet (Units 1 to 3 are). You can still drill it phrase by phrase.</div>';}
+  h+='<details class="card"><summary><b>Manage audio</b></summary><p class="small">Add more tapes:</p><input type="file" id="drFiles" accept="audio/*,.mp3" multiple>'+list.map(function(x){return '<div class="wsrow"><div class="small">'+esc(x.label)+' · '+fmtT(x.dur||0)+' · '+(x.n||0)+' phrases</div><button class="btn ghost" style="padding:5px 9px;font-size:12px" data-drdel="'+esc(x.key)+'">Remove</button></div>';}).join("")+'</details>';
+  return h;
+}
+function bindDrills(){
+  if(!dr.tapes){drInit().then(function(){if(current==="drills")render();});return;}
+  var fi=el("drFiles");if(fi)fi.onchange=function(){if(fi.files&&fi.files.length)drImport(fi.files);};
+  var sel=el("drSel");if(sel)sel.onchange=function(){drLoad(sel.value).then(function(){persist();render();});};
+  var b;
+  if((b=el("drPlayBtn")))b.onclick=function(){if(dr.playing){drStop();drPaint();}else drPlay(dr.i);};
+  if((b=el("drPrev")))b.onclick=function(){drPlay(dr.i-1);};
+  if((b=el("drNext")))b.onclick=function(){drPlay(dr.i+1);};
+  if((b=el("drAgain")))b.onclick=function(){drPlay(dr.i);};
+  document.querySelectorAll("[data-drmode]").forEach(function(x){x.onclick=function(){drStop();dr.mode=x.dataset.drmode;render();};});
+  document.querySelectorAll("[data-drreps]").forEach(function(x){x.onclick=function(){dr.reps=+x.dataset.drreps;render();};});
+  document.querySelectorAll("[data-drrate]").forEach(function(x){x.onclick=function(){dr.rate=+x.dataset.drrate;if(drAudio)drAudio.playbackRate=dr.rate;render();};});
+  var list=el("drList");if(list)list.onclick=function(e){var r=e.target.closest("[data-seg]");if(r)drPlay(+r.dataset.seg);};
+  document.querySelectorAll("[data-drtape]").forEach(function(x){x.onclick=function(){var keep=dr.mode;drPlay(+x.dataset.drtape);};});
+  document.querySelectorAll("[data-drlink]").forEach(function(x){x.onclick=function(){drLinks()[x.dataset.drlink]=dr.i;persist();var y=window.scrollY;render();window.scrollTo(0,y);};});
+  if((b=el("drLinkSel")))b.onchange=function(){if(!b.value)return;drLinks()[b.value]=dr.i;persist();var y=window.scrollY;render();window.scrollTo(0,y);};
+  if((b=el("drStar")))b.onclick=function(){var f=fsiState();f.stars[dr.key]=f.stars[dr.key]||{};if(f.stars[dr.key][dr.i])delete f.stars[dr.key][dr.i];else f.stars[dr.key][dr.i]=1;persist();var y=window.scrollY;render();window.scrollTo(0,y);};
+  if((b=el("drHideEn")))b.onchange=function(){fsiState().hideEn=b.checked;persist();var y=window.scrollY;render();window.scrollTo(0,y);};
+  document.querySelectorAll("[data-drdel]").forEach(function(x){x.onclick=function(){var k=x.dataset.drdel;drStop();delete dr.tapes[k];Promise.all([idbDel("audio",k),idbDel("kv","seg:"+k),idbSet("kv","tapes",dr.tapes)]).then(function(){if(dr.key===k){dr.key=null;dr.segs=[];var l=tapeList();if(l.length)return drLoad(l[0].key);}}).then(function(){render();});};});
+  drPaint();
+}
+
+// ---------- EXTRAS: watch with dual subtitles ----------
+var wt={videoEl:null,url:null,name:"",ko:[],en:[],offKo:0,offEn:0,showKo:true,showEn:true,auto:false,cur:-1,pausedFor:-1,restored:false,raf:null};
+function decodeText(ab){var u=new Uint8Array(ab);if(u[0]===0xFF&&u[1]===0xFE)return new TextDecoder("utf-16le").decode(ab);if(u[0]===0xFE&&u[1]===0xFF)return new TextDecoder("utf-16be").decode(ab);try{return new TextDecoder("utf-8",{fatal:true}).decode(ab);}catch(e){try{return new TextDecoder("euc-kr").decode(ab);}catch(e2){return new TextDecoder().decode(ab);}}}
+function subTime(s){var m=/(?:(\d+):)?(\d+):(\d+)[.,](\d+)/.exec(s);if(!m)return null;return (+(m[1]||0))*3600+(+m[2])*60+(+m[3])+(+("0."+m[4]));}
+function cleanSub(t){return t.replace(/\{[^}]*\}/g,"").replace(/<[^>]+>/g,"").replace(/\\N/gi," ").replace(/\s+/g," ").trim();}
+function parseSubs(txt){
+  txt=txt.replace(/^﻿/,"").replace(/\r/g,"");var cues=[];
+  if(/^Dialogue:/m.test(txt)){txt.split("\n").forEach(function(l){if(l.indexOf("Dialogue:")!==0)return;var p=l.slice(9).split(",");if(p.length<10)return;var s=subTime(p[1].trim()),e=subTime(p[2].trim()),t=cleanSub(p.slice(9).join(","));if(s!==null&&e!==null&&t)cues.push([s,e,t]);});}
+  else{txt.split(/\n{2,}/).forEach(function(b){var ls=b.split("\n"),k=-1;for(var i=0;i<ls.length;i++){if(ls[i].indexOf("-->")>=0){k=i;break;}}if(k<0)return;var p=ls[k].split("-->"),s=subTime(p[0]),e=subTime(p[1]),t=cleanSub(ls.slice(k+1).join(" "));if(s!==null&&e!==null&&t)cues.push([s,e,t]);});}
+  cues.sort(function(a,b){return a[0]-b[0];});return cues;
+}
+function cueAt(cues,t){var lo=0,hi=cues.length-1,r=-1;while(lo<=hi){var m=(lo+hi)>>1;if(cues[m][0]<=t){r=m;lo=m+1;}else hi=m-1;}return (r>=0&&t<cues[r][1])?r:-1;}
+function cueBefore(cues,t){var lo=0,hi=cues.length-1,r=-1;while(lo<=hi){var m=(lo+hi)>>1;if(cues[m][0]<=t){r=m;lo=m+1;}else hi=m-1;}return r;}
+function wtSave(){idbSet("kv","wt:last",{name:wt.name,ko:wt.ko,en:wt.en,offKo:wt.offKo,offEn:wt.offEn});}
+function wtEnFor(c){if(!wt.en.length)return "";var mid=(c[0]+c[1])/2-wt.offKo+wt.offEn,i=cueAt(wt.en,mid);if(i<0){i=cueBefore(wt.en,mid);if(i<0||mid-wt.en[i][1]>1.5)return "";}return wt.en[i][2];}
+function viewWatch(){
+  var h='<span class="eyebrow">Laptop · offline</span><h1>Watch</h1><p class="muted">Play your own video file with Korean and English subtitles together. Tap a Korean word to pause, look it up and save it.</p>';
+  h+='<div class="card"><div class="wtpick"><label class="small"><b>1 · Video file</b> (MP4 or WebM works best)<br><input type="file" id="wtVid" accept="video/*,.mkv,.mp4,.webm,.m4v"></label><label class="small"><b>2 · Korean subtitles</b> (.srt, .vtt or .ass)<br><input type="file" id="wtKoF" accept=".srt,.vtt,.ass,.ssa,.txt"></label><label class="small"><b>3 · English subtitles</b><br><input type="file" id="wtEnF" accept=".srt,.vtt,.ass,.ssa,.txt"></label></div><div class="small muted" id="wtMsg">'+(wt.ko.length?esc((wt.name||"Subtitles")+": "+wt.ko.length+" Korean lines"+(wt.en.length?", "+wt.en.length+" English lines":"")+" loaded."+(wt.url?"":" Pick the video file again to play.")):"Nothing leaves your computer. Subtitles are remembered; the video file has to be picked again each time you open the app.")+'</div></div>';
+  h+='<div class="wtstage" id="wtStage"><video id="wtVideo" playsinline controls'+(wt.url?' src="'+wt.url+'"':'')+'></video><div class="wtsubs" id="wtSubs"><div class="ko wtko" id="wtKo"></div><div class="wten" id="wtEn"></div></div></div>';
+  h+='<div class="row small"><button class="btn ghost" id="wtPrev">⏮ Line</button><button class="btn ghost" id="wtRep">↺ Repeat line</button><button class="btn ghost" id="wtNext">Line ⏭</button><label><input type="checkbox" id="wtShowKo"'+(wt.showKo?' checked':'')+'> Korean</label><label><input type="checkbox" id="wtShowEn"'+(wt.showEn?' checked':'')+'> English</label><label><input type="checkbox" id="wtAuto"'+(wt.auto?' checked':'')+'> Pause after each line</label><label>Speed <select id="wtRate"><option value="0.75">0.75×</option><option value="1" selected>1×</option><option value="1.25">1.25×</option></select></label><button class="btn ghost" id="wtFull">Full screen</button></div>';
+  h+='<div class="row small"><span><b>Subtitle timing</b> if the text is early or late:</span><span>Korean <button class="btn ghost wtoff" data-off="ko:-0.25">−</button> <b id="wtOffKo">'+wt.offKo.toFixed(2)+' s</b> <button class="btn ghost wtoff" data-off="ko:0.25">+</button></span><span>English <button class="btn ghost wtoff" data-off="en:-0.25">−</button> <b id="wtOffEn">'+wt.offEn.toFixed(2)+' s</b> <button class="btn ghost wtoff" data-off="en:0.25">+</button></span></div>';
+  h+='<p class="small muted">Keys: Space play or pause · A previous line · S repeat line · D next line · E English on or off · K Korean on or off · P pause after each line.</p>';
+  h+='<div class="card"><h3>Lines</h3><div id="wtList" class="drlist" style="max-height:420px">'+(wt.ko.length?wt.ko.map(function(c,i){return '<div class="wtrow" data-cue="'+i+'" data-ctx="'+esc(c[2])+'" data-src="'+esc(wt.name)+'"><button class="t" data-wtseek="'+i+'">'+fmtT(c[0]+wt.offKo)+'</button><div><div class="ko" style="font-size:17px">'+tokHtml(c[2])+'</div><div class="small muted">'+esc(wtEnFor(c))+'</div></div></div>';}).join(""):'<p class="small muted">Load Korean subtitles to see every line here. This list works even without the video.</p>')+'</div></div>';
+  return h;
+}
+function wtPaint(){
+  var v=wt.videoEl;if(!v)return;var t=v.currentTime,i=cueAt(wt.ko,t-wt.offKo),ko=el("wtKo"),en=el("wtEn");if(!ko)return;
+  if(wt.auto&&wt.cur>=0&&i!==wt.cur&&!v.paused&&wt.pausedFor!==wt.cur&&wt.ko[wt.cur]&&t-wt.offKo>=wt.ko[wt.cur][1]-0.05){wt.pausedFor=wt.cur;v.pause();return;}
+  if(i!==wt.cur){wt.cur=i;
+    if(i>=0){ko.innerHTML=wt.showKo?tokHtml(wt.ko[i][2]):"";ko.setAttribute("data-ctx",wt.ko[i][2]);ko.setAttribute("data-src",wt.name);}else ko.innerHTML="";
+    var list=el("wtList");if(list){var on=list.querySelector(".on");if(on)on.classList.remove("on");var row=i>=0?list.querySelector('[data-cue="'+i+'"]'):null;if(row){row.classList.add("on");var top=row.offsetTop-list.offsetTop;if(top<list.scrollTop||top>list.scrollTop+list.clientHeight-60)list.scrollTop=Math.max(0,top-80);}}
+  }
+  var j=wt.en.length?cueAt(wt.en,t-wt.offEn):-1;en.textContent=(wt.showEn&&j>=0)?wt.en[j][2]:"";
+}
+function wtLoop(){if(current!=="watch"){wt.raf=null;return;}wtPaint();wt.raf=requestAnimationFrame(wtLoop);}
+function wtLine(d){var v=wt.videoEl;if(!v||!wt.ko.length)return;var t=v.currentTime-wt.offKo,i=cueBefore(wt.ko,t+0.01);if(d===0){if(i<0)i=0;}else if(d<0){i=(i>=0&&t-wt.ko[i][0]>1.2)?i:i-1;if(i<0)i=0;}else{i=Math.min(wt.ko.length-1,i+1);}wt.pausedFor=-1;wt.cur=-2;v.currentTime=Math.max(0,wt.ko[i][0]+wt.offKo+0.01);var p=v.play();if(p&&p.catch)p.catch(function(){});}
+function bindWatch(){
+  var v=el("wtVideo");wt.videoEl=v;wt.cur=-2;
+  if(!wt.restored){wt.restored=true;idbGet("kv","wt:last").then(function(s){if(s&&!wt.ko.length){wt.name=s.name||"";wt.ko=s.ko||[];wt.en=s.en||[];wt.offKo=s.offKo||0;wt.offEn=s.offEn||0;if(current==="watch")render();}});}
+  function readSub(inp,which){inp.onchange=function(){var f=inp.files&&inp.files[0];if(!f)return;f.arrayBuffer().then(function(ab){var cues=parseSubs(decodeText(ab));if(!cues.length){el("wtMsg").textContent="Couldn't read any lines from "+f.name+". Use an .srt, .vtt or .ass file.";return;}wt[which]=cues;if(!wt.name)wt.name=f.name.replace(/\.[a-z0-9]+$/i,"");wtSave();render();});};}
+  readSub(el("wtKoF"),"ko");readSub(el("wtEnF"),"en");
+  el("wtVid").onchange=function(){var f=this.files&&this.files[0];if(!f)return;if(wt.url){try{URL.revokeObjectURL(wt.url);}catch(e){}}wt.url=URL.createObjectURL(f);wt.name=f.name.replace(/\.[a-z0-9]+$/i,"");wtSave();render();};
+  v.addEventListener("error",function(){if(wt.url)el("wtMsg").textContent="This browser can't play that file. Convert it to MP4 (H.264 video, AAC audio) and try again.";});
+  v.addEventListener("loadedmetadata",function(){idbGet("kv","wt:pos:"+wt.name).then(function(p){if(p&&p<v.duration-5)v.currentTime=p;});});
+  v.addEventListener("pause",function(){if(wt.name&&v.currentTime>1)idbSet("kv","wt:pos:"+wt.name,v.currentTime);});
+  el("wtPrev").onclick=function(){wtLine(-1);};el("wtRep").onclick=function(){wtLine(0);};el("wtNext").onclick=function(){wtLine(1);};
+  el("wtShowKo").onchange=function(){wt.showKo=this.checked;wt.cur=-2;};el("wtShowEn").onchange=function(){wt.showEn=this.checked;};el("wtAuto").onchange=function(){wt.auto=this.checked;};
+  el("wtRate").onchange=function(){v.playbackRate=+this.value;};
+  el("wtFull").onclick=function(){var s=el("wtStage");try{if(document.fullscreenElement)document.exitFullscreen();else (s.requestFullscreen||s.webkitRequestFullscreen).call(s);}catch(e){}};
+  document.querySelectorAll(".wtoff").forEach(function(b){b.onclick=function(){var p=b.dataset.off.split(":");if(p[0]==="ko"){wt.offKo=Math.round((wt.offKo+(+p[1]))*100)/100;el("wtOffKo").textContent=wt.offKo.toFixed(2)+" s";}else{wt.offEn=Math.round((wt.offEn+(+p[1]))*100)/100;el("wtOffEn").textContent=wt.offEn.toFixed(2)+" s";}wt.cur=-2;wtSave();};});
+  var list=el("wtList");if(list)list.onclick=function(e){var b=e.target.closest("[data-wtseek]");if(!b)return;var c=wt.ko[+b.dataset.wtseek];wt.pausedFor=-1;wt.cur=-2;if(v&&wt.url){v.currentTime=Math.max(0,c[0]+wt.offKo+0.01);var p=v.play();if(p&&p.catch)p.catch(function(){});}};
+  if(!wt.raf)wt.raf=requestAnimationFrame(wtLoop);
+}
+document.addEventListener("keydown",function(e){
+  if(current!=="watch"||!wt.videoEl)return;var tg=e.target&&e.target.tagName;if(tg==="INPUT"||tg==="TEXTAREA"||tg==="SELECT")return;
+  var k=e.key.toLowerCase(),v=wt.videoEl;
+  if(k===" "){e.preventDefault();if(v.paused){wt.pausedFor=wt.cur;var p=v.play();if(p&&p.catch)p.catch(function(){});}else v.pause();}
+  else if(k==="a"||k==="arrowleft"){e.preventDefault();wtLine(-1);}
+  else if(k==="s"||k==="arrowdown"){e.preventDefault();wtLine(0);}
+  else if(k==="d"||k==="arrowright"){e.preventDefault();wtLine(1);}
+  else if(k==="e"){wt.showEn=!wt.showEn;var c=el("wtShowEn");if(c)c.checked=wt.showEn;}
+  else if(k==="k"){wt.showKo=!wt.showKo;wt.cur=-2;var c2=el("wtShowKo");if(c2)c2.checked=wt.showKo;}
+  else if(k==="p"){wt.auto=!wt.auto;var c3=el("wtAuto");if(c3)c3.checked=wt.auto;}
+  else if(k==="escape"){closeSheet();}
+});
 
 nav("today");
 // ---------- SYNC ----------
