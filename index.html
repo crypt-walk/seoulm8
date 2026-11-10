@@ -136,6 +136,10 @@ textarea{width:100%;min-height:70px}
 .wtrow{display:grid;grid-template-columns:52px 1fr;gap:10px;padding:8px 10px;border-bottom:1px solid var(--line)}
 .wtrow .t{border:0;background:none;font:12px var(--mono);color:var(--sea);cursor:pointer;text-align:left;padding:4px 0}
 .wtoff{padding:3px 9px;font-size:12px}
+.wtfollow{background:#0a1417;color:#fff;border-radius:12px;padding:12px 14px;min-height:150px;display:flex;flex-direction:column;gap:6px}
+.wtfollow .muted{color:#9fb3b8}
+.wtko2{font-size:clamp(22px,5.4vw,34px);font-weight:600;line-height:1.4;min-height:1.4em}.wtko2 .tk{border-bottom-color:rgba(255,255,255,.45)}.wtko2 .tk:hover,.wtko2 .tk:active{background:rgba(255,255,255,.2)}
+.wten2{font-size:clamp(15px,3.6vw,20px);color:#d5e2e5;min-height:1.4em}
 </style>
 
 <header class="bar"><div class="bar-in">
@@ -1072,69 +1076,142 @@ function bindDrills(){
 }
 
 // ---------- EXTRAS: watch with dual subtitles ----------
-var wt={videoEl:null,url:null,name:"",ko:[],en:[],offKo:0,offEn:0,showKo:true,showEn:true,auto:false,cur:-1,pausedFor:-1,restored:false,raf:null};
+var wt={mode:"follow",videoEl:null,url:null,name:"",ko:[],en:[],offKo:0,offEn:0,showKo:true,showEn:true,auto:false,cur:-1,pausedFor:-1,restored:false,raf:null,untimed:false,clk:{base:0,start:0,run:false}};
+function wtNow(){if(wt.mode==="follow")return wt.clk.base+(wt.clk.run?(Date.now()-wt.clk.start)/1000:0);return wt.videoEl?wt.videoEl.currentTime:0;}
+function clkSet(t){wt.clk.base=Math.max(0,t);wt.clk.start=Date.now();wt.cur=-2;}
+function clkRun(run){if(run===wt.clk.run)return;if(run){wt.clk.start=Date.now();wt.clk.run=true;}else{wt.clk.base=wtNow();wt.clk.run=false;if(wt.name)idbSet("kv","wt:pos:"+wt.name,wt.clk.base);}var b=el("wtClkBtn");if(b)b.textContent=wt.clk.run?"⏸ Pause clock":"▶ Start clock";}
 function decodeText(ab){var u=new Uint8Array(ab);if(u[0]===0xFF&&u[1]===0xFE)return new TextDecoder("utf-16le").decode(ab);if(u[0]===0xFE&&u[1]===0xFF)return new TextDecoder("utf-16be").decode(ab);try{return new TextDecoder("utf-8",{fatal:true}).decode(ab);}catch(e){try{return new TextDecoder("euc-kr").decode(ab);}catch(e2){return new TextDecoder().decode(ab);}}}
-function subTime(s){var m=/(?:(\d+):)?(\d+):(\d+)[.,](\d+)/.exec(s);if(!m)return null;return (+(m[1]||0))*3600+(+m[2])*60+(+m[3])+(+("0."+m[4]));}
+function subTime(s){var m=/(?:(\d+):)?(\d+):(\d+)(?:[.,](\d+))?/.exec(s);if(!m)return null;return (+(m[1]||0))*3600+(+m[2])*60+(+m[3])+(m[4]?+("0."+m[4]):0);}
 function cleanSub(t){return t.replace(/\{[^}]*\}/g,"").replace(/<[^>]+>/g,"").replace(/\\N/gi," ").replace(/\s+/g," ").trim();}
+function hasKo(s){return /[가-힣]/.test(s);}
 function parseSubs(txt){
   txt=txt.replace(/^﻿/,"").replace(/\r/g,"");var cues=[];
   if(/^Dialogue:/m.test(txt)){txt.split("\n").forEach(function(l){if(l.indexOf("Dialogue:")!==0)return;var p=l.slice(9).split(",");if(p.length<10)return;var s=subTime(p[1].trim()),e=subTime(p[2].trim()),t=cleanSub(p.slice(9).join(","));if(s!==null&&e!==null&&t)cues.push([s,e,t]);});}
   else{txt.split(/\n{2,}/).forEach(function(b){var ls=b.split("\n"),k=-1;for(var i=0;i<ls.length;i++){if(ls[i].indexOf("-->")>=0){k=i;break;}}if(k<0)return;var p=ls[k].split("-->"),s=subTime(p[0]),e=subTime(p[1]),t=cleanSub(ls.slice(k+1).join(" "));if(s!==null&&e!==null&&t)cues.push([s,e,t]);});}
   cues.sort(function(a,b){return a[0]-b[0];});return cues;
 }
+// Tables (pasted from a spreadsheet, or an exported .xlsx/.tsv/.csv): any column order; a time column is optional.
+function parseTable(rows){
+  var ko=[],en=[],timed=0,nums=[];
+  rows.forEach(function(cells){
+    var t=null,k="",e="";
+    cells.forEach(function(c){c=String(c==null?"":c).trim();if(!c)return;
+      if(t===null&&/^\d+:\d\d(:\d\d)?([.,]\d+)?$/.test(c)){t=subTime(c);return;}
+      if(t===null&&/^\d+(\.\d+)?$/.test(c)){t=+c;nums.push(t);return;}
+      if(hasKo(c)){if(!k)k=cleanSub(c);}else if(!e&&/[A-Za-z]{2}/.test(c))e=cleanSub(c);});
+    if(!k&&!e)return;if(t!==null)timed++;ko.push([t,null,k]);en.push([t,null,e]);
+  });
+  if(ko.some(function(c){return c[2];})){var keep=ko.map(function(c){return !!c[2];});ko=ko.filter(function(c,i){return keep[i];});en=en.filter(function(c,i){return keep[i];});timed=ko.filter(function(c){return c[0]!==null;}).length;}
+  var frac=nums.length&&nums.every(function(x){return x<1;});
+  var untimed=timed<ko.length*0.6;
+  function fix(a){var out=[];a.forEach(function(c,i){var s=untimed?i*4:(c[0]===null?(i?out[out.length-1]?out[out.length-1][0]+2:0:0):(frac?c[0]*86400:c[0]));if(c[2])out.push([s,0,c[2]]);});out.sort(function(x,y){return x[0]-y[0];});out.forEach(function(c,i){var nx=out[i+1]?out[i+1][0]:c[0]+6;c[1]=untimed?c[0]+4:Math.min(nx,c[0]+Math.max(1.5,Math.min(8,c[2].length*0.25)));});return out;}
+  return {ko:fix(ko),en:fix(en),untimed:untimed};
+}
+function splitRows(txt){txt=txt.replace(/^﻿/,"").replace(/\r/g,"");var tab=txt.indexOf("\t")>=0;return txt.split("\n").map(function(l){if(tab)return l.split("\t");var m=l.match(/("([^"]|"")*"|[^,]*)(,|$)/g);if(m&&l.indexOf(",")>=0&&/^\s*"?\d+[:.]/.test(l))return m.map(function(c){return c.replace(/,$/,"").replace(/^"|"$/g,"").replace(/""/g,'"');});return [l];});}
+function inflateRaw(d){var s=new Blob([d]).stream().pipeThrough(new DecompressionStream("deflate-raw"));return new Response(s).arrayBuffer().then(function(b){return new Uint8Array(b);});}
+function xlsxRows(ab){
+  var u=new Uint8Array(ab),dv=new DataView(ab),i=u.length-22;while(i>=0&&dv.getUint32(i,true)!==0x06054b50)i--;if(i<0)return Promise.reject();
+  var cnt=dv.getUint16(i+10,true),off=dv.getUint32(i+16,true),jobs=[],out={},td=new TextDecoder();
+  for(var k=0;k<cnt;k++){var method=dv.getUint16(off+10,true),cs=dv.getUint32(off+20,true),nl=dv.getUint16(off+28,true),xl=dv.getUint16(off+30,true),cl=dv.getUint16(off+32,true),lho=dv.getUint32(off+42,true),name=td.decode(u.subarray(off+46,off+46+nl));off+=46+nl+xl+cl;
+    if(name==="xl/sharedStrings.xml"||/^xl\/worksheets\/sheet1?\.xml$/.test(name)){(function(name,method,lho,cs){var st=lho+30+dv.getUint16(lho+26,true)+dv.getUint16(lho+28,true),data=u.subarray(st,st+cs);jobs.push((method===0?Promise.resolve(data):inflateRaw(data)).then(function(d){out[name]=td.decode(d);}));})(name,method,lho,cs);}}
+  return Promise.all(jobs).then(function(){
+    var ss=[],P=new DOMParser();if(out["xl/sharedStrings.xml"]){Array.prototype.forEach.call(P.parseFromString(out["xl/sharedStrings.xml"],"application/xml").getElementsByTagName("si"),function(si){ss.push(Array.prototype.map.call(si.getElementsByTagName("t"),function(t){return t.textContent;}).join(""));});}
+    var sx=out["xl/worksheets/sheet1.xml"]||out["xl/worksheets/sheet.xml"];if(!sx)throw 0;
+    return Array.prototype.map.call(P.parseFromString(sx,"application/xml").getElementsByTagName("row"),function(r){return Array.prototype.map.call(r.getElementsByTagName("c"),function(c){var t=c.getAttribute("t"),v=c.getElementsByTagName("v")[0];if(t==="s")return ss[+(v?v.textContent:0)]||"";if(t==="inlineStr"){var x=c.getElementsByTagName("t")[0];return x?x.textContent:"";}return v?v.textContent:"";});});
+  });
+}
+function wtApply(res,which,name){
+  // res: {ko,en,untimed} from a table, or {cues} from a subtitle file
+  if(res.cues){var k=res.cues.filter(function(c){return hasKo(c[2]);}).length>res.cues.length/2;var target=which||(k?"ko":"en");wt[target]=res.cues;if(target==="ko")wt.untimed=false;}
+  else{if(res.ko.length){wt.ko=res.ko;wt.untimed=res.untimed;wt.en=res.en;}else if(res.en.length)wt.en=res.en;}
+  if(name&&(!wt.name||which!=="en"))wt.name=name.replace(/\.[a-z0-9]+$/i,"").replace(/[._-](ko|kor|korean|en|eng|english)$/i,"");
+  clkSet(0);wtSave();render();
+}
+function wtReadFile(f,which){
+  var done=function(res){if((res.cues&&!res.cues.length)||(!res.cues&&!res.ko.length&&!res.en.length)){el("wtMsg").textContent="Couldn't read any subtitle lines from "+f.name+".";return;}wtApply(res,which,f.name);};
+  return f.arrayBuffer().then(function(ab){
+    if(/\.xlsx$/i.test(f.name))return xlsxRows(ab).then(function(rows){done(parseTable(rows));},function(){el("wtMsg").textContent="Couldn't open that Excel file. Try copying the rows and pasting them in the box instead.";});
+    var txt=decodeText(ab);if(txt.indexOf("-->")>=0||/^Dialogue:/m.test(txt))done({cues:parseSubs(txt)});else done(parseTable(splitRows(txt)));
+  });
+}
 function cueAt(cues,t){var lo=0,hi=cues.length-1,r=-1;while(lo<=hi){var m=(lo+hi)>>1;if(cues[m][0]<=t){r=m;lo=m+1;}else hi=m-1;}return (r>=0&&t<cues[r][1])?r:-1;}
 function cueBefore(cues,t){var lo=0,hi=cues.length-1,r=-1;while(lo<=hi){var m=(lo+hi)>>1;if(cues[m][0]<=t){r=m;lo=m+1;}else hi=m-1;}return r;}
-function wtSave(){idbSet("kv","wt:last",{name:wt.name,ko:wt.ko,en:wt.en,offKo:wt.offKo,offEn:wt.offEn});}
-function wtEnFor(c){if(!wt.en.length)return "";var mid=(c[0]+c[1])/2-wt.offKo+wt.offEn,i=cueAt(wt.en,mid);if(i<0){i=cueBefore(wt.en,mid);if(i<0||mid-wt.en[i][1]>1.5)return "";}return wt.en[i][2];}
+function wtSave(){idbSet("kv","wt:last",{name:wt.name,ko:wt.ko,en:wt.en,offKo:wt.offKo,offEn:wt.offEn,mode:wt.mode,untimed:wt.untimed});}
+function wtEnFor(c){if(!wt.en.length)return "";var mid=(c[0]+Math.min(c[1],c[0]+2))/2-0+wt.offKo-wt.offEn,i=cueAt(wt.en,mid);if(i<0){i=cueBefore(wt.en,mid);if(i<0||mid-wt.en[i][1]>1.5)return "";}return wt.en[i][2];}
 function viewWatch(){
-  var h='<span class="eyebrow">Laptop · offline</span><h1>Watch</h1><p class="muted">Play your own video file with Korean and English subtitles together. Tap a Korean word to pause, look it up and save it.</p>';
-  h+='<div class="card"><div class="wtpick"><label class="small"><b>1 · Video file</b> (MP4 or WebM works best)<br><input type="file" id="wtVid" accept="video/*,.mkv,.mp4,.webm,.m4v"></label><label class="small"><b>2 · Korean subtitles</b> (.srt, .vtt or .ass)<br><input type="file" id="wtKoF" accept=".srt,.vtt,.ass,.ssa,.txt"></label><label class="small"><b>3 · English subtitles</b><br><input type="file" id="wtEnF" accept=".srt,.vtt,.ass,.ssa,.txt"></label></div><div class="small muted" id="wtMsg">'+(wt.ko.length?esc((wt.name||"Subtitles")+": "+wt.ko.length+" Korean lines"+(wt.en.length?", "+wt.en.length+" English lines":"")+" loaded."+(wt.url?"":" Pick the video file again to play.")):"Nothing leaves your computer. Subtitles are remembered; the video file has to be picked again each time you open the app.")+'</div></div>';
-  h+='<div class="wtstage" id="wtStage"><video id="wtVideo" playsinline controls'+(wt.url?' src="'+wt.url+'"':'')+'></video><div class="wtsubs" id="wtSubs"><div class="ko wtko" id="wtKo"></div><div class="wten" id="wtEn"></div></div></div>';
-  h+='<div class="row small"><button class="btn ghost" id="wtPrev">⏮ Line</button><button class="btn ghost" id="wtRep">↺ Repeat line</button><button class="btn ghost" id="wtNext">Line ⏭</button><label><input type="checkbox" id="wtShowKo"'+(wt.showKo?' checked':'')+'> Korean</label><label><input type="checkbox" id="wtShowEn"'+(wt.showEn?' checked':'')+'> English</label><label><input type="checkbox" id="wtAuto"'+(wt.auto?' checked':'')+'> Pause after each line</label><label>Speed <select id="wtRate"><option value="0.75">0.75×</option><option value="1" selected>1×</option><option value="1.25">1.25×</option></select></label><button class="btn ghost" id="wtFull">Full screen</button></div>';
-  h+='<div class="row small"><span><b>Subtitle timing</b> if the text is early or late:</span><span>Korean <button class="btn ghost wtoff" data-off="ko:-0.25">−</button> <b id="wtOffKo">'+wt.offKo.toFixed(2)+' s</b> <button class="btn ghost wtoff" data-off="ko:0.25">+</button></span><span>English <button class="btn ghost wtoff" data-off="en:-0.25">−</button> <b id="wtOffEn">'+wt.offEn.toFixed(2)+' s</b> <button class="btn ghost wtoff" data-off="en:0.25">+</button></span></div>';
-  h+='<p class="small muted">Keys: Space play or pause · A previous line · S repeat line · D next line · E English on or off · K Korean on or off · P pause after each line.</p>';
-  h+='<div class="card"><h3>Lines</h3><div id="wtList" class="drlist" style="max-height:420px">'+(wt.ko.length?wt.ko.map(function(c,i){return '<div class="wtrow" data-cue="'+i+'" data-ctx="'+esc(c[2])+'" data-src="'+esc(wt.name)+'"><button class="t" data-wtseek="'+i+'">'+fmtT(c[0]+wt.offKo)+'</button><div><div class="ko" style="font-size:17px">'+tokHtml(c[2])+'</div><div class="small muted">'+esc(wtEnFor(c))+'</div></div></div>';}).join(""):'<p class="small muted">Load Korean subtitles to see every line here. This list works even without the video.</p>')+'</div></div>';
+  var fol=wt.mode==="follow";
+  var h='<span class="eyebrow">Dual subtitles</span><h1>Watch</h1>';
+  h+='<div class="row"><button class="btn'+(fol?'':' ghost')+'" data-wtmode="follow">Alongside Netflix</button><button class="btn'+(fol?' ghost':'')+'" data-wtmode="file">My own video file</button></div>';
+  h+=fol?'<p class="muted">Play the episode in Netflix in a floating window on top of this page. This page shows both subtitles, line by line, on its own clock that you keep in step with the video.</p>':'<p class="muted">Play an unprotected video file with Korean and English subtitles over the picture. Best on a laptop.</p>';
+  h+='<details class="card"'+(wt.ko.length?'':' open')+'><summary><b>Subtitles for this episode</b> <span class="small muted" id="wtMsg">'+(wt.ko.length?esc((wt.name||"Loaded")+": "+wt.ko.length+" Korean lines"+(wt.en.length?", "+wt.en.length+" English":"")+(wt.untimed?" (no timings)":"")):"none loaded yet")+'</span></summary><div class="wtpick" style="margin-top:10px">'+(fol?'':'<label class="small"><b>Video file</b> (MP4 or WebM)<br><input type="file" id="wtVid" accept="video/*,.mkv,.mp4,.webm,.m4v"></label>')+'<label class="small"><b>Korean subtitles</b>, or one file with both languages<br><input type="file" id="wtKoF" accept=".srt,.vtt,.ass,.ssa,.txt,.tsv,.csv,.xlsx"></label><label class="small"><b>English subtitles</b> (if separate)<br><input type="file" id="wtEnF" accept=".srt,.vtt,.ass,.ssa,.txt,.tsv,.csv,.xlsx"></label></div><label class="small" for="wtPaste"><b>Or paste</b> subtitle text or spreadsheet rows (time, Korean, English in any order):</label><textarea id="wtPaste" rows="3" placeholder="Paste here"></textarea><div class="row"><button class="btn ghost" id="wtPasteGo" style="padding:7px 10px;font-size:12px">Use pasted text</button><span class="small muted">Accepted: .srt, .vtt, .ass, and .xlsx, .tsv or .csv exports. Subtitles stay on this device.</span></div></details>';
+  if(fol){
+    h+='<div class="wtfollow" id="wtStage"><div class="row" style="justify-content:space-between"><span class="small" id="wtClock" style="font-family:var(--mono)">0:00</span><span class="small muted">'+esc(wt.name)+'</span></div><div class="ko wtko2" id="wtKo"></div><div class="wten2" id="wtEn"></div></div>';
+    h+='<div class="row small" style="justify-content:center">'+(wt.untimed?'':'<button class="btn red" id="wtClkBtn">'+(wt.clk.run?'⏸ Pause clock':'▶ Start clock')+'</button>')+'<button class="btn ghost" id="wtPrev">⏮ Line</button><button class="btn ghost" id="wtNext">Line ⏭</button>'+(wt.untimed?'':'<button class="btn ghost wtnudge" data-n="-0.5">−0.5 s</button><button class="btn ghost wtnudge" data-n="0.5">+0.5 s</button>')+'</div>';
+    h+='<div class="row small"><label><input type="checkbox" id="wtShowKo"'+(wt.showKo?' checked':'')+'> Korean</label><label><input type="checkbox" id="wtShowEn"'+(wt.showEn?' checked':'')+'> English</label></div>';
+    h+=wt.untimed?'<p class="small muted">These subtitles have no timings, so step through them with the Line buttons or tap a line.</p>':'<p class="small muted"><b>To lock on:</b> start the episode, then tap the line you hear in the list below. The clock jumps to that line and keeps running. If Netflix pauses, pause the clock too. Use ±0.5 s if the text runs early or late. Keys on a laptop: Space clock · A and D lines · [ and ] nudge.</p>';
+  } else {
+    h+='<div class="wtstage" id="wtStage"><video id="wtVideo" playsinline controls'+(wt.url?' src="'+wt.url+'"':'')+'></video><div class="wtsubs"><div class="ko wtko" id="wtKo"></div><div class="wten" id="wtEn"></div></div></div>';
+    h+='<div class="row small"><button class="btn ghost" id="wtPrev">⏮ Line</button><button class="btn ghost" id="wtRep">↺ Repeat line</button><button class="btn ghost" id="wtNext">Line ⏭</button><label><input type="checkbox" id="wtShowKo"'+(wt.showKo?' checked':'')+'> Korean</label><label><input type="checkbox" id="wtShowEn"'+(wt.showEn?' checked':'')+'> English</label><label><input type="checkbox" id="wtAuto"'+(wt.auto?' checked':'')+'> Pause after each line</label><label>Speed <select id="wtRate"><option value="0.75">0.75×</option><option value="1" selected>1×</option><option value="1.25">1.25×</option></select></label><button class="btn ghost" id="wtFull">Full screen</button></div>';
+    h+='<div class="row small"><span><b>Subtitle timing</b></span><span>Korean <button class="btn ghost wtoff" data-off="ko:-0.25">−</button> <b id="wtOffKo">'+wt.offKo.toFixed(2)+' s</b> <button class="btn ghost wtoff" data-off="ko:0.25">+</button></span><span>English <button class="btn ghost wtoff" data-off="en:-0.25">−</button> <b id="wtOffEn">'+wt.offEn.toFixed(2)+' s</b> <button class="btn ghost wtoff" data-off="en:0.25">+</button></span></div>';
+    h+='<p class="small muted">Keys: Space play or pause · A previous line · S repeat line · D next line · E English · K Korean · P pause after each line.</p>';
+  }
+  h+='<div class="card"><h3>Lines</h3><div id="wtList" class="drlist" style="max-height:'+(fol?'46vh':'420px')+'">'+(wt.ko.length?wt.ko.map(function(c,i){return '<div class="wtrow" data-cue="'+i+'" data-ctx="'+esc(c[2])+'" data-src="'+esc(wt.name)+'"><button class="t" data-wtseek="'+i+'" aria-label="Jump to this line">'+(wt.untimed?(i+1):fmtT(c[0]+wt.offKo))+'</button><div><div class="ko" style="font-size:17px">'+tokHtml(c[2])+'</div><div class="small muted">'+esc(wtEnFor(c))+'</div></div></div>';}).join(""):'<p class="small muted" style="padding:10px">Load the episode\'s Korean subtitles above to see every line here.</p>')+'</div></div>';
   return h;
 }
 function wtPaint(){
-  var v=wt.videoEl;if(!v)return;var t=v.currentTime,i=cueAt(wt.ko,t-wt.offKo),ko=el("wtKo"),en=el("wtEn");if(!ko)return;
-  if(wt.auto&&wt.cur>=0&&i!==wt.cur&&!v.paused&&wt.pausedFor!==wt.cur&&wt.ko[wt.cur]&&t-wt.offKo>=wt.ko[wt.cur][1]-0.05){wt.pausedFor=wt.cur;v.pause();return;}
+  var v=wt.videoEl,fol=wt.mode==="follow",ko=el("wtKo"),en=el("wtEn");if(!ko||(!fol&&!v))return;
+  var t=wtNow(),i=cueAt(wt.ko,t-wt.offKo);
+  if(fol){var ck=el("wtClock");if(ck)ck.textContent=wt.untimed?"":fmtT(t)+(wt.clk.run?"":" · paused");if(i<0&&wt.ko.length){var pb=cueBefore(wt.ko,t-wt.offKo);if(pb>=0&&(wt.untimed||t-wt.offKo-wt.ko[pb][1]<1.5))i=pb;}}
+  if(!fol&&wt.auto&&wt.cur>=0&&i!==wt.cur&&!v.paused&&wt.pausedFor!==wt.cur&&wt.ko[wt.cur]&&t-wt.offKo>=wt.ko[wt.cur][1]-0.05){wt.pausedFor=wt.cur;v.pause();return;}
   if(i!==wt.cur){wt.cur=i;
     if(i>=0){ko.innerHTML=wt.showKo?tokHtml(wt.ko[i][2]):"";ko.setAttribute("data-ctx",wt.ko[i][2]);ko.setAttribute("data-src",wt.name);}else ko.innerHTML="";
+    if(fol)en.textContent=(wt.showEn&&i>=0)?wtEnFor(wt.ko[i]):"";
     var list=el("wtList");if(list){var on=list.querySelector(".on");if(on)on.classList.remove("on");var row=i>=0?list.querySelector('[data-cue="'+i+'"]'):null;if(row){row.classList.add("on");var top=row.offsetTop-list.offsetTop;if(top<list.scrollTop||top>list.scrollTop+list.clientHeight-60)list.scrollTop=Math.max(0,top-80);}}
   }
-  var j=wt.en.length?cueAt(wt.en,t-wt.offEn):-1;en.textContent=(wt.showEn&&j>=0)?wt.en[j][2]:"";
+  if(!fol){var j=wt.en.length?cueAt(wt.en,t-wt.offEn):-1;en.textContent=(wt.showEn&&j>=0)?wt.en[j][2]:"";}
 }
 function wtLoop(){if(current!=="watch"){wt.raf=null;return;}wtPaint();wt.raf=requestAnimationFrame(wtLoop);}
-function wtLine(d){var v=wt.videoEl;if(!v||!wt.ko.length)return;var t=v.currentTime-wt.offKo,i=cueBefore(wt.ko,t+0.01);if(d===0){if(i<0)i=0;}else if(d<0){i=(i>=0&&t-wt.ko[i][0]>1.2)?i:i-1;if(i<0)i=0;}else{i=Math.min(wt.ko.length-1,i+1);}wt.pausedFor=-1;wt.cur=-2;v.currentTime=Math.max(0,wt.ko[i][0]+wt.offKo+0.01);var p=v.play();if(p&&p.catch)p.catch(function(){});}
+function wtGo(i){var c=wt.ko[i];if(!c)return;wt.pausedFor=-1;wt.cur=-2;if(wt.mode==="follow"){clkSet(c[0]+wt.offKo+0.01);if(!wt.untimed)clkRun(true);return;}var v=wt.videoEl;if(v&&wt.url){v.currentTime=Math.max(0,c[0]+wt.offKo+0.01);var p=v.play();if(p&&p.catch)p.catch(function(){});}}
+function wtLine(d){if(!wt.ko.length)return;var t=wtNow()-wt.offKo,i=cueBefore(wt.ko,t+0.01);if(d===0){if(i<0)i=0;}else if(d<0){i=(wt.mode!=="follow"&&i>=0&&t-wt.ko[i][0]>1.2)?i:i-1;if(i<0)i=0;}else{i=Math.min(wt.ko.length-1,i+1);}wtGo(i);}
 function bindWatch(){
-  var v=el("wtVideo");wt.videoEl=v;wt.cur=-2;
-  if(!wt.restored){wt.restored=true;idbGet("kv","wt:last").then(function(s){if(s&&!wt.ko.length){wt.name=s.name||"";wt.ko=s.ko||[];wt.en=s.en||[];wt.offKo=s.offKo||0;wt.offEn=s.offEn||0;if(current==="watch")render();}});}
-  function readSub(inp,which){inp.onchange=function(){var f=inp.files&&inp.files[0];if(!f)return;f.arrayBuffer().then(function(ab){var cues=parseSubs(decodeText(ab));if(!cues.length){el("wtMsg").textContent="Couldn't read any lines from "+f.name+". Use an .srt, .vtt or .ass file.";return;}wt[which]=cues;if(!wt.name)wt.name=f.name.replace(/\.[a-z0-9]+$/i,"");wtSave();render();});};}
-  readSub(el("wtKoF"),"ko");readSub(el("wtEnF"),"en");
-  el("wtVid").onchange=function(){var f=this.files&&this.files[0];if(!f)return;if(wt.url){try{URL.revokeObjectURL(wt.url);}catch(e){}}wt.url=URL.createObjectURL(f);wt.name=f.name.replace(/\.[a-z0-9]+$/i,"");wtSave();render();};
-  v.addEventListener("error",function(){if(wt.url)el("wtMsg").textContent="This browser can't play that file. Convert it to MP4 (H.264 video, AAC audio) and try again.";});
-  v.addEventListener("loadedmetadata",function(){idbGet("kv","wt:pos:"+wt.name).then(function(p){if(p&&p<v.duration-5)v.currentTime=p;});});
-  v.addEventListener("pause",function(){if(wt.name&&v.currentTime>1)idbSet("kv","wt:pos:"+wt.name,v.currentTime);});
-  el("wtPrev").onclick=function(){wtLine(-1);};el("wtRep").onclick=function(){wtLine(0);};el("wtNext").onclick=function(){wtLine(1);};
-  el("wtShowKo").onchange=function(){wt.showKo=this.checked;wt.cur=-2;};el("wtShowEn").onchange=function(){wt.showEn=this.checked;};el("wtAuto").onchange=function(){wt.auto=this.checked;};
-  el("wtRate").onchange=function(){v.playbackRate=+this.value;};
-  el("wtFull").onclick=function(){var s=el("wtStage");try{if(document.fullscreenElement)document.exitFullscreen();else (s.requestFullscreen||s.webkitRequestFullscreen).call(s);}catch(e){}};
-  document.querySelectorAll(".wtoff").forEach(function(b){b.onclick=function(){var p=b.dataset.off.split(":");if(p[0]==="ko"){wt.offKo=Math.round((wt.offKo+(+p[1]))*100)/100;el("wtOffKo").textContent=wt.offKo.toFixed(2)+" s";}else{wt.offEn=Math.round((wt.offEn+(+p[1]))*100)/100;el("wtOffEn").textContent=wt.offEn.toFixed(2)+" s";}wt.cur=-2;wtSave();};});
-  var list=el("wtList");if(list)list.onclick=function(e){var b=e.target.closest("[data-wtseek]");if(!b)return;var c=wt.ko[+b.dataset.wtseek];wt.pausedFor=-1;wt.cur=-2;if(v&&wt.url){v.currentTime=Math.max(0,c[0]+wt.offKo+0.01);var p=v.play();if(p&&p.catch)p.catch(function(){});}};
+  var v=el("wtVideo"),fol=wt.mode==="follow",b;wt.videoEl=v||null;wt.cur=-2;
+  if(!wt.restored){wt.restored=true;idbGet("kv","wt:last").then(function(s){if(s&&!wt.ko.length){wt.name=s.name||"";wt.ko=s.ko||[];wt.en=s.en||[];wt.offKo=s.offKo||0;wt.offEn=s.offEn||0;wt.untimed=!!s.untimed;if(s.mode)wt.mode=s.mode;return idbGet("kv","wt:pos:"+wt.name).then(function(p){if(p)wt.clk.base=p;if(current==="watch")render();});}});}
+  document.querySelectorAll("[data-wtmode]").forEach(function(x){x.onclick=function(){if(wt.mode==="follow")clkRun(false);wt.mode=x.dataset.wtmode;wtSave();render();};});
+  el("wtKoF").onchange=function(){if(this.files&&this.files[0])wtReadFile(this.files[0],null);};
+  el("wtEnF").onchange=function(){if(this.files&&this.files[0])wtReadFile(this.files[0],"en");};
+  el("wtPasteGo").onclick=function(){var txt=el("wtPaste").value||"";if(!txt.trim())return;var res=(txt.indexOf("-->")>=0||/^Dialogue:/m.test(txt))?{cues:parseSubs(txt)}:parseTable(splitRows(txt));if((res.cues&&!res.cues.length)||(!res.cues&&!res.ko.length&&!res.en.length)){el("wtMsg").textContent="couldn't find subtitle lines in the pasted text";return;}wtApply(res,null,wt.name||"Pasted subtitles");};
+  if((b=el("wtVid")))b.onchange=function(){var f=this.files&&this.files[0];if(!f)return;if(wt.url){try{URL.revokeObjectURL(wt.url);}catch(e){}}wt.url=URL.createObjectURL(f);wt.name=f.name.replace(/\.[a-z0-9]+$/i,"");wtSave();render();};
+  if(v){
+    v.addEventListener("error",function(){if(wt.url)el("wtMsg").textContent="this browser can't play that file; convert it to MP4 (H.264 video, AAC audio)";});
+    v.addEventListener("loadedmetadata",function(){idbGet("kv","wt:pos:"+wt.name).then(function(p){if(p&&p<v.duration-5)v.currentTime=p;});});
+    v.addEventListener("pause",function(){if(wt.name&&v.currentTime>1)idbSet("kv","wt:pos:"+wt.name,v.currentTime);});
+  }
+  el("wtPrev").onclick=function(){wtLine(-1);};el("wtNext").onclick=function(){wtLine(1);};
+  if((b=el("wtRep")))b.onclick=function(){wtLine(0);};
+  if((b=el("wtClkBtn")))b.onclick=function(){clkRun(!wt.clk.run);};
+  document.querySelectorAll(".wtnudge").forEach(function(x){x.onclick=function(){clkSet(wtNow()+(+x.dataset.n));};});
+  el("wtShowKo").onchange=function(){wt.showKo=this.checked;wt.cur=-2;};el("wtShowEn").onchange=function(){wt.showEn=this.checked;wt.cur=-2;};
+  if((b=el("wtAuto")))b.onchange=function(){wt.auto=this.checked;};
+  if((b=el("wtRate")))b.onchange=function(){v.playbackRate=+this.value;};
+  if((b=el("wtFull")))b.onclick=function(){var s=el("wtStage");try{if(document.fullscreenElement)document.exitFullscreen();else (s.requestFullscreen||s.webkitRequestFullscreen).call(s);}catch(e){}};
+  document.querySelectorAll(".wtoff").forEach(function(x){x.onclick=function(){var p=x.dataset.off.split(":");if(p[0]==="ko"){wt.offKo=Math.round((wt.offKo+(+p[1]))*100)/100;el("wtOffKo").textContent=wt.offKo.toFixed(2)+" s";}else{wt.offEn=Math.round((wt.offEn+(+p[1]))*100)/100;el("wtOffEn").textContent=wt.offEn.toFixed(2)+" s";}wt.cur=-2;wtSave();};});
+  var list=el("wtList");if(list)list.onclick=function(e){var x=e.target.closest("[data-wtseek]");if(x)wtGo(+x.dataset.wtseek);};
   if(!wt.raf)wt.raf=requestAnimationFrame(wtLoop);
 }
 document.addEventListener("keydown",function(e){
-  if(current!=="watch"||!wt.videoEl)return;var tg=e.target&&e.target.tagName;if(tg==="INPUT"||tg==="TEXTAREA"||tg==="SELECT")return;
-  var k=e.key.toLowerCase(),v=wt.videoEl;
-  if(k===" "){e.preventDefault();if(v.paused){wt.pausedFor=wt.cur;var p=v.play();if(p&&p.catch)p.catch(function(){});}else v.pause();}
+  if(current!=="watch")return;var tg=e.target&&e.target.tagName;if(tg==="INPUT"||tg==="TEXTAREA"||tg==="SELECT")return;
+  var k=e.key.toLowerCase(),v=wt.videoEl,fol=wt.mode==="follow",c;
+  if(k==="escape"){closeSheet();return;}
+  if(!fol&&!v)return;
+  if(k===" "){e.preventDefault();if(fol){if(!wt.untimed)clkRun(!wt.clk.run);}else if(v.paused){wt.pausedFor=wt.cur;var p=v.play();if(p&&p.catch)p.catch(function(){});}else v.pause();}
   else if(k==="a"||k==="arrowleft"){e.preventDefault();wtLine(-1);}
-  else if(k==="s"||k==="arrowdown"){e.preventDefault();wtLine(0);}
+  else if((k==="s"||k==="arrowdown")&&!fol){e.preventDefault();wtLine(0);}
   else if(k==="d"||k==="arrowright"){e.preventDefault();wtLine(1);}
-  else if(k==="e"){wt.showEn=!wt.showEn;var c=el("wtShowEn");if(c)c.checked=wt.showEn;}
-  else if(k==="k"){wt.showKo=!wt.showKo;wt.cur=-2;var c2=el("wtShowKo");if(c2)c2.checked=wt.showKo;}
-  else if(k==="p"){wt.auto=!wt.auto;var c3=el("wtAuto");if(c3)c3.checked=wt.auto;}
-  else if(k==="escape"){closeSheet();}
+  else if(k==="["&&fol){clkSet(wtNow()-0.5);}
+  else if(k==="]"&&fol){clkSet(wtNow()+0.5);}
+  else if(k==="e"){wt.showEn=!wt.showEn;wt.cur=-2;if((c=el("wtShowEn")))c.checked=wt.showEn;}
+  else if(k==="k"){wt.showKo=!wt.showKo;wt.cur=-2;if((c=el("wtShowKo")))c.checked=wt.showKo;}
+  else if(k==="p"&&!fol){wt.auto=!wt.auto;if((c=el("wtAuto")))c.checked=wt.auto;}
 });
 
 nav("today");
