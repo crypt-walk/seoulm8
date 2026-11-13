@@ -133,6 +133,9 @@ textarea{width:100%;min-height:70px}
 .wtsubs>div:empty{display:none}
 .wtko{font-size:clamp(20px,2.6vw,34px);font-weight:600;line-height:1.4}.wtko .tk{border-bottom-color:rgba(255,255,255,.5)}.wtko .tk:hover{background:rgba(255,255,255,.25)}
 .wten{font-size:clamp(14px,1.6vw,22px)}
+.wtro{font-size:clamp(14px,1.7vw,22px);font-style:italic;color:#ffe9a8}
+.wtro2{font-size:clamp(15px,3.6vw,21px);font-style:italic;color:#ffe9a8;min-height:1.3em}
+.wtrow .ro{font-style:italic;color:var(--sea);font-size:13px}
 .wtrow{display:grid;grid-template-columns:52px 1fr;gap:10px;padding:8px 10px;border-bottom:1px solid var(--line)}
 .wtrow .t{border:0;background:none;font:12px var(--mono);color:var(--sea);cursor:pointer;text-align:left;padding:4px 0}
 .wtoff{padding:3px 9px;font-size:12px}
@@ -567,7 +570,7 @@ function viewHelp(){
   h+='<div class="card"><h3>1 · Install the Korean voice on iPhone (offline, free)</h3><ul><li>Settings → Accessibility → Spoken Content → Voices → <b>Korean</b> → download <b>Yuna</b> (the Enhanced version if offered).</li><li>Then reopen this page. The ▶ buttons should speak Korean.</li><li>On a Mac laptop: System Settings → Accessibility → Spoken Content → System voice → Manage Voices → Korean.</li></ul><p class="small">Voice status on this device: <b>'+(hasVoice()?('Korean voice found ✓ ('+esc(koVoice.name)+')'):'no Korean voice found yet')+'</b> <button class="btn ghost" id="voiceTest" style="padding:6px 10px;font-size:12px">Test</button><br><span class="small" id="vtMsg" style="color:var(--sea)"></span></p></div>';
   h+='<div class="card"><h3>Add a Korean keyboard (for the Notes tab)</h3><ul><li><b>iPhone:</b> Settings → General → Keyboard → Keyboards → Add New Keyboard → Korean → <b>Standard</b>. Tap the globe key to switch.</li><li><b>Mac:</b> System Settings → Keyboard → Text Input → Edit → + → Korean → <b>2-Set Korean</b>. Switch with Ctrl+Space or the menu-bar input icon.</li><li><b>Windows:</b> Settings → Time &amp; language → Language &amp; region → Add a language → Korean. Switch with Win+Space, then press Right Alt to toggle Hangul.</li></ul></div><div class="card"><h3>2 · Book your italki trial for Tue 3 Nov, 19:00</h3><ul><li>italki.com → Find a teacher → Korean. Filter for <i>Professional teacher</i> and <i>Also speaks English</i>, then check their Tuesday-evening availability (Thailand time).</li><li>Look for reviews that mention beginners and pronunciation. You can take up to three discounted trials, each with a different teacher.</li><li>Tell them your goal: messages for your partner and her parents, plus basic conversation, by late December.</li></ul></div>';
   h+='<div class="card"><h3>3 · Download the free FSI audio before week 2</h3><p>From <a href="https://www.fsi-language-courses.org/fsi-korean-basic-course-new/" target="_blank" rel="noopener">fsi-language-courses.org → Korean Basic Course</a>, download the PDF and the zip files for Units 1–3 to your phone. You\'ll start on them on 8 Nov.</p></div>';
-  h+='<div class="card"><h3>App version 5</h3><p class="small">This version has the Drills, Watch and Words tabs. With internet on, tap the button to fetch the newest version.</p><div class="row"><button class="btn ghost" id="updBtn">Check for update</button><span class="small muted" id="updMsg"></span></div></div>';
+  h+='<div class="card"><h3>App version 6</h3><p class="small">This version has the Drills, Watch (with romanised subtitles) and Words tabs. With internet on, tap the button to fetch the newest version.</p><div class="row"><button class="btn ghost" id="updBtn">Check for update</button><span class="small muted" id="updMsg"></span></div></div>';
   h+='<div class="card"><h3>Move progress between copies</h3><p class="small">Use this with the offline copy for the boat. In the copy you used last, tap <b>Copy my progress</b> and paste it into a note or a message to yourself. Then open the other copy, paste it below and tap <b>Merge</b>. Lessons, ticked blocks and flashcards are combined; nothing is lost.</p><div class="row"><button class="btn ghost" id="pxCopy">Copy my progress</button><span class="small muted" id="pxMsg"></span></div><textarea id="pxIn" rows="3" placeholder="Paste progress here"></textarea><div><button class="btn" id="pxMerge">Merge</button></div></div>';
   h+='<div class="card"><h3>How your progress is saved</h3><p class="small">Your progress syncs through claude.ai between your laptop and iPhone, as long as you open this page signed in. A copy is also kept on each device. Claude can read your progress when you ask how it\'s going. This page needs internet; an offline copy for the boat comes with the GitHub version.</p><p class="small">Status: <b id="sync2">'+esc(syncNote)+'</b></p></div>';
   return h;
@@ -1077,8 +1080,42 @@ function bindDrills(){
   drPaint();
 }
 
+// ---------- EXTRAS: Revised Romanisation with the main sound changes ----------
+var RR=(function(){
+  var INI="ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ".split(""),FIN=["","ㄱ","ㄲ","ㄳ","ㄴ","ㄵ","ㄶ","ㄷ","ㄹ","ㄺ","ㄻ","ㄼ","ㄽ","ㄾ","ㄿ","ㅀ","ㅁ","ㅂ","ㅄ","ㅅ","ㅆ","ㅇ","ㅈ","ㅊ","ㅋ","ㅌ","ㅍ","ㅎ"];
+  var VOW="a ae ya yae eo e yeo ye o wa wae oe yo u wo we wi yu eu ui i".split(" ");
+  var IR={"ㄱ":"g","ㄲ":"kk","ㄴ":"n","ㄷ":"d","ㄸ":"tt","ㄹ":"r","ㅁ":"m","ㅂ":"b","ㅃ":"pp","ㅅ":"s","ㅆ":"ss","ㅇ":"","ㅈ":"j","ㅉ":"jj","ㅊ":"ch","ㅋ":"k","ㅌ":"t","ㅍ":"p","ㅎ":"h"};
+  var FR={"":"","ㄱ":"k","ㄴ":"n","ㄷ":"t","ㄹ":"l","ㅁ":"m","ㅂ":"p","ㅇ":"ng"};
+  var SPLIT={"ㄳ":"ㄱㅅ","ㄵ":"ㄴㅈ","ㄶ":"ㄴㅎ","ㄺ":"ㄹㄱ","ㄻ":"ㄹㅁ","ㄼ":"ㄹㅂ","ㄽ":"ㄹㅅ","ㄾ":"ㄹㅌ","ㄿ":"ㄹㅍ","ㅀ":"ㄹㅎ","ㅄ":"ㅂㅅ"};
+  var NEUT={"":"","ㄱ":"ㄱ","ㄲ":"ㄱ","ㅋ":"ㄱ","ㄳ":"ㄱ","ㄺ":"ㄱ","ㄴ":"ㄴ","ㄵ":"ㄴ","ㄶ":"ㄴ","ㄷ":"ㄷ","ㅅ":"ㄷ","ㅆ":"ㄷ","ㅈ":"ㄷ","ㅊ":"ㄷ","ㅌ":"ㄷ","ㅎ":"ㄷ","ㄹ":"ㄹ","ㄼ":"ㄹ","ㄽ":"ㄹ","ㄾ":"ㄹ","ㅀ":"ㄹ","ㅁ":"ㅁ","ㄻ":"ㅁ","ㅂ":"ㅂ","ㅍ":"ㅂ","ㅄ":"ㅂ","ㄿ":"ㅂ","ㅇ":"ㅇ"};
+  var ASP={"ㄱ":"ㅋ","ㄷ":"ㅌ","ㅂ":"ㅍ","ㅈ":"ㅊ"};
+  function word(syl){
+    for(var k=0;k<syl.length-1;k++){var a=syl[k],b=syl[k+1],f=a.f,c=b.i;if(!f)continue;
+      if(c==="ㅇ"){
+        if(f==="ㅇ")continue; if(f==="ㅎ"){a.f="";continue;}
+        if(SPLIT[f]){var x=SPLIT[f][0],y=SPLIT[f][1];if(y==="ㅎ"){a.f="";b.i=x;}else{a.f=x;b.i=y;}continue;}
+        a.f="";b.i=f;if(b.m===20){if(f==="ㄷ")b.i="ㅈ";else if(f==="ㅌ")b.i="ㅊ";}continue;}
+      if(c==="ㅎ"&&f!=="ㅎ"&&f!=="ㄶ"&&f!=="ㅀ"){var n0=NEUT[f];if(n0==="ㄱ"||n0==="ㄷ"||n0==="ㅂ"){b.i=(f==="ㅈ"||f==="ㅊ")?"ㅊ":ASP[n0];a.f=(f==="ㄺ"||f==="ㄼ")?"ㄹ":"";continue;}}
+      if(f==="ㅎ"||f==="ㄶ"||f==="ㅀ"){var rem=f==="ㅎ"?"":SPLIT[f][0];
+        if(c==="ㄱ"||c==="ㄷ"||c==="ㅈ"){b.i=ASP[c];a.f=rem;continue;}
+        if(c==="ㅅ"){b.i="ㅆ";a.f=rem;continue;}
+        if(c==="ㄴ"){if(f==="ㅀ"){a.f="ㄹ";b.i="ㄹ";}else a.f="ㄴ";continue;}
+        if(c==="ㅎ"){a.f=rem;continue;}
+        f=rem||"ㄷ";}
+      var n=NEUT[f]||"";a.f=n;
+      if(c==="ㄴ"||c==="ㅁ"){if(n==="ㄱ")a.f="ㅇ";else if(n==="ㄷ")a.f="ㄴ";else if(n==="ㅂ")a.f="ㅁ";else if(n==="ㄹ"&&c==="ㄴ")b.i="ㄹ";}
+      else if(c==="ㄹ"){if(n==="ㄴ")a.f="ㄹ";else if(n==="ㅁ"||n==="ㅇ")b.i="ㄴ";else if(n==="ㄱ"||n==="ㄷ"||n==="ㅂ"){b.i="ㄴ";a.f=n==="ㄱ"?"ㅇ":n==="ㄷ"?"ㄴ":"ㅁ";}}
+    }
+    var out="";syl.forEach(function(s,k){var ini=IR[s.i];if(s.i==="ㄹ"&&k>0&&syl[k-1].f==="ㄹ")ini="l";out+=ini+VOW[s.m]+FR[NEUT[s.f]||""];});return out;
+  }
+  return function(t){if(!t)return "";var cache=RR.c||(RR.c={});if(cache[t]!==undefined)return cache[t];var out="",run=[];
+    function flush(){if(run.length){out+=word(run);run=[];}}
+    for(var i=0;i<t.length;i++){var c=t.charCodeAt(i)-0xAC00;if(c>=0&&c<=11171){run.push({i:INI[Math.floor(c/588)],m:Math.floor((c%588)/28),f:FIN[c%28]});}else{flush();out+=t[i];}}
+    flush();return (cache[t]=out);};
+})();
+function romOf(t){return RR(t);}
 // ---------- EXTRAS: watch with dual subtitles ----------
-var wt={mode:"follow",videoEl:null,url:null,name:"",ko:[],en:[],offKo:0,offEn:0,showKo:true,showEn:true,auto:false,cur:-1,pausedFor:-1,restored:false,raf:null,untimed:false,clk:{base:0,start:0,run:false}};
+var wt={mode:"follow",videoEl:null,url:null,name:"",ko:[],en:[],offKo:0,offEn:0,showKo:true,showRo:true,showEn:true,auto:false,cur:-1,pausedFor:-1,restored:false,raf:null,untimed:false,clk:{base:0,start:0,run:false}};
 function wtNow(){if(wt.mode==="follow")return wt.clk.base+(wt.clk.run?(Date.now()-wt.clk.start)/1000:0);return wt.videoEl?wt.videoEl.currentTime:0;}
 function clkSet(t){wt.clk.base=Math.max(0,t);wt.clk.start=Date.now();wt.cur=-2;}
 function clkRun(run){if(run===wt.clk.run)return;if(run){wt.clk.start=Date.now();wt.clk.run=true;}else{wt.clk.base=wtNow();wt.clk.run=false;if(wt.name)idbSet("kv","wt:pos:"+wt.name,wt.clk.base);}var b=el("wtClkBtn");if(b)b.textContent=wt.clk.run?"⏸ Pause clock":"▶ Start clock";}
@@ -1147,26 +1184,27 @@ function viewWatch(){
   h+=fol?'<p class="muted">Play the episode in Netflix in a floating window on top of this page. This page shows both subtitles, line by line, on its own clock that you keep in step with the video.</p>':'<p class="muted">Play an unprotected video file with Korean and English subtitles over the picture. Best on a laptop.</p>';
   h+='<details class="card"'+(wt.ko.length?'':' open')+'><summary><b>Subtitles for this episode</b> <span class="small muted" id="wtMsg">'+(wt.ko.length?esc((wt.name||"Loaded")+": "+wt.ko.length+" Korean lines"+(wt.en.length?", "+wt.en.length+" English":"")+(wt.untimed?" (no timings)":"")):"none loaded yet")+'</span></summary><div class="wtpick" style="margin-top:10px">'+(fol?'':'<label class="small"><b>Video file</b> (MP4 or WebM)<br><input type="file" id="wtVid" accept="video/*,.mkv,.mp4,.webm,.m4v"></label>')+'<label class="small"><b>Korean subtitles</b>, or one file with both languages<br><input type="file" id="wtKoF" accept=".srt,.vtt,.ass,.ssa,.txt,.tsv,.csv,.xlsx"></label><label class="small"><b>English subtitles</b> (if separate)<br><input type="file" id="wtEnF" accept=".srt,.vtt,.ass,.ssa,.txt,.tsv,.csv,.xlsx"></label></div><label class="small" for="wtPaste"><b>Or paste</b> subtitle text or spreadsheet rows (time, Korean, English in any order):</label><textarea id="wtPaste" rows="3" placeholder="Paste here"></textarea><div class="row"><button class="btn ghost" id="wtPasteGo" style="padding:7px 10px;font-size:12px">Use pasted text</button><span class="small muted">Accepted: .srt, .vtt, .ass, and .xlsx, .tsv or .csv exports. Subtitles stay on this device.</span></div></details>';
   if(fol){
-    h+='<div class="wtfollow" id="wtStage"><div class="row" style="justify-content:space-between"><span class="small" id="wtClock" style="font-family:var(--mono)">0:00</span><span class="small muted">'+esc(wt.name)+'</span></div><div class="ko wtko2" id="wtKo"></div><div class="wten2" id="wtEn"></div></div>';
+    h+='<div class="wtfollow" id="wtStage"><div class="row" style="justify-content:space-between"><span class="small" id="wtClock" style="font-family:var(--mono)">0:00</span><span class="small muted">'+esc(wt.name)+'</span></div><div class="ko wtko2" id="wtKo"></div><div class="wtro2" id="wtRo"></div><div class="wten2" id="wtEn"></div></div>';
     h+='<div class="row small" style="justify-content:center">'+(wt.untimed?'':'<button class="btn red" id="wtClkBtn">'+(wt.clk.run?'⏸ Pause clock':'▶ Start clock')+'</button>')+'<button class="btn ghost" id="wtPrev">⏮ Line</button><button class="btn ghost" id="wtNext">Line ⏭</button>'+(wt.untimed?'':'<button class="btn ghost wtnudge" data-n="-0.5">−0.5 s</button><button class="btn ghost wtnudge" data-n="0.5">+0.5 s</button>')+'</div>';
-    h+='<div class="row small"><label><input type="checkbox" id="wtShowKo"'+(wt.showKo?' checked':'')+'> Korean</label><label><input type="checkbox" id="wtShowEn"'+(wt.showEn?' checked':'')+'> English</label></div>';
-    h+=wt.untimed?'<p class="small muted">These subtitles have no timings, so step through them with the Line buttons or tap a line.</p>':'<p class="small muted"><b>To lock on:</b> start the episode, then tap the line you hear in the list below. The clock jumps to that line and keeps running. If Netflix pauses, pause the clock too. Use ±0.5 s if the text runs early or late. Keys on a laptop: Space clock · A and D lines · [ and ] nudge.</p>';
+    h+='<div class="row small"><label><input type="checkbox" id="wtShowKo"'+(wt.showKo?' checked':'')+'> Korean</label><label><input type="checkbox" id="wtShowRo"'+(wt.showRo?' checked':'')+'> Romanised</label><label><input type="checkbox" id="wtShowEn"'+(wt.showEn?' checked':'')+'> English</label></div>';
+    h+=wt.untimed?'<p class="small muted">These subtitles have no timings, so step through them with the Line buttons or tap a line.</p>':'<p class="small muted"><b>To lock on:</b> start the episode, then tap the line you hear in the list below. The clock jumps to that line and keeps running. If Netflix pauses, pause the clock too. Use ±0.5 s if the text runs early or late. Keys on a laptop: Space clock · A and D lines · [ and ] nudge · K, R, E toggle Korean, romanised, English.</p>';
   } else {
-    h+='<div class="wtstage" id="wtStage"><video id="wtVideo" playsinline controls'+(wt.url?' src="'+wt.url+'"':'')+'></video><div class="wtsubs"><div class="ko wtko" id="wtKo"></div><div class="wten" id="wtEn"></div></div></div>';
-    h+='<div class="row small"><button class="btn ghost" id="wtPrev">⏮ Line</button><button class="btn ghost" id="wtRep">↺ Repeat line</button><button class="btn ghost" id="wtNext">Line ⏭</button><label><input type="checkbox" id="wtShowKo"'+(wt.showKo?' checked':'')+'> Korean</label><label><input type="checkbox" id="wtShowEn"'+(wt.showEn?' checked':'')+'> English</label><label><input type="checkbox" id="wtAuto"'+(wt.auto?' checked':'')+'> Pause after each line</label><label>Speed <select id="wtRate"><option value="0.75">0.75×</option><option value="1" selected>1×</option><option value="1.25">1.25×</option></select></label><button class="btn ghost" id="wtFull">Full screen</button></div>';
+    h+='<div class="wtstage" id="wtStage"><video id="wtVideo" playsinline controls'+(wt.url?' src="'+wt.url+'"':'')+'></video><div class="wtsubs"><div class="ko wtko" id="wtKo"></div><div class="wtro" id="wtRo"></div><div class="wten" id="wtEn"></div></div></div>';
+    h+='<div class="row small"><button class="btn ghost" id="wtPrev">⏮ Line</button><button class="btn ghost" id="wtRep">↺ Repeat line</button><button class="btn ghost" id="wtNext">Line ⏭</button><label><input type="checkbox" id="wtShowKo"'+(wt.showKo?' checked':'')+'> Korean</label><label><input type="checkbox" id="wtShowRo"'+(wt.showRo?' checked':'')+'> Romanised</label><label><input type="checkbox" id="wtShowEn"'+(wt.showEn?' checked':'')+'> English</label><label><input type="checkbox" id="wtAuto"'+(wt.auto?' checked':'')+'> Pause after each line</label><label>Speed <select id="wtRate"><option value="0.75">0.75×</option><option value="1" selected>1×</option><option value="1.25">1.25×</option></select></label><button class="btn ghost" id="wtFull">Full screen</button></div>';
     h+='<div class="row small"><span><b>Subtitle timing</b></span><span>Korean <button class="btn ghost wtoff" data-off="ko:-0.25">−</button> <b id="wtOffKo">'+wt.offKo.toFixed(2)+' s</b> <button class="btn ghost wtoff" data-off="ko:0.25">+</button></span><span>English <button class="btn ghost wtoff" data-off="en:-0.25">−</button> <b id="wtOffEn">'+wt.offEn.toFixed(2)+' s</b> <button class="btn ghost wtoff" data-off="en:0.25">+</button></span></div>';
-    h+='<p class="small muted">Keys: Space play or pause · A previous line · S repeat line · D next line · E English · K Korean · P pause after each line.</p>';
+    h+='<p class="small muted">Keys: Space play or pause · A previous line · S repeat line · D next line · E English · K Korean · R romanised · P pause after each line.</p>';
   }
-  h+='<div class="card"><h3>Lines</h3><div id="wtList" class="drlist" style="max-height:'+(fol?'46vh':'420px')+'">'+(wt.ko.length?wt.ko.map(function(c,i){return '<div class="wtrow" data-cue="'+i+'" data-ctx="'+esc(c[2])+'" data-src="'+esc(wt.name)+'"><button class="t" data-wtseek="'+i+'" aria-label="Jump to this line">'+(wt.untimed?(i+1):fmtT(c[0]+wt.offKo))+'</button><div><div class="ko" style="font-size:17px">'+tokHtml(c[2])+'</div><div class="small muted">'+esc(wtEnFor(c))+'</div></div></div>';}).join(""):'<p class="small muted" style="padding:10px">Load the episode\'s Korean subtitles above to see every line here.</p>')+'</div></div>';
+  h+='<div class="card"><h3>Lines</h3><div id="wtList" class="drlist" style="max-height:'+(fol?'46vh':'420px')+'">'+(wt.ko.length?wt.ko.map(function(c,i){return '<div class="wtrow" data-cue="'+i+'" data-ctx="'+esc(c[2])+'" data-src="'+esc(wt.name)+'"><button class="t" data-wtseek="'+i+'" aria-label="Jump to this line">'+(wt.untimed?(i+1):fmtT(c[0]+wt.offKo))+'</button><div><div class="ko" style="font-size:17px">'+tokHtml(c[2])+'</div><div class="ro">'+esc(romOf(c[2]))+'</div><div class="small muted">'+esc(wtEnFor(c))+'</div></div></div>';}).join(""):'<p class="small muted" style="padding:10px">Load the episode\'s Korean subtitles above to see every line here.</p>')+'</div></div>';
   return h;
 }
 function wtPaint(){
-  var v=wt.videoEl,fol=wt.mode==="follow",ko=el("wtKo"),en=el("wtEn");if(!ko||(!fol&&!v))return;
+  var v=wt.videoEl,fol=wt.mode==="follow",ko=el("wtKo"),en=el("wtEn"),ro=el("wtRo");if(!ko||(!fol&&!v))return;
   var t=wtNow(),i=cueAt(wt.ko,t-wt.offKo);
   if(fol){var ck=el("wtClock");if(ck)ck.textContent=wt.untimed?"":fmtT(t)+(wt.clk.run?"":" · paused");if(i<0&&wt.ko.length){var pb=cueBefore(wt.ko,t-wt.offKo);if(pb>=0&&(wt.untimed||t-wt.offKo-wt.ko[pb][1]<1.5))i=pb;}}
   if(!fol&&wt.auto&&wt.cur>=0&&i!==wt.cur&&!v.paused&&wt.pausedFor!==wt.cur&&wt.ko[wt.cur]&&t-wt.offKo>=wt.ko[wt.cur][1]-0.05){wt.pausedFor=wt.cur;v.pause();return;}
   if(i!==wt.cur){wt.cur=i;
     if(i>=0){ko.innerHTML=wt.showKo?tokHtml(wt.ko[i][2]):"";ko.setAttribute("data-ctx",wt.ko[i][2]);ko.setAttribute("data-src",wt.name);}else ko.innerHTML="";
+    if(ro)ro.textContent=(wt.showRo&&i>=0)?romOf(wt.ko[i][2]):"";
     if(fol)en.textContent=(wt.showEn&&i>=0)?wtEnFor(wt.ko[i]):"";
     var list=el("wtList");if(list){var on=list.querySelector(".on");if(on)on.classList.remove("on");var row=i>=0?list.querySelector('[data-cue="'+i+'"]'):null;if(row){row.classList.add("on");var top=row.offsetTop-list.offsetTop;if(top<list.scrollTop||top>list.scrollTop+list.clientHeight-60)list.scrollTop=Math.max(0,top-80);}}
   }
@@ -1192,7 +1230,7 @@ function bindWatch(){
   if((b=el("wtRep")))b.onclick=function(){wtLine(0);};
   if((b=el("wtClkBtn")))b.onclick=function(){clkRun(!wt.clk.run);};
   document.querySelectorAll(".wtnudge").forEach(function(x){x.onclick=function(){clkSet(wtNow()+(+x.dataset.n));};});
-  el("wtShowKo").onchange=function(){wt.showKo=this.checked;wt.cur=-2;};el("wtShowEn").onchange=function(){wt.showEn=this.checked;wt.cur=-2;};
+  el("wtShowKo").onchange=function(){wt.showKo=this.checked;wt.cur=-2;};el("wtShowEn").onchange=function(){wt.showEn=this.checked;wt.cur=-2;};el("wtShowRo").onchange=function(){wt.showRo=this.checked;wt.cur=-2;};
   if((b=el("wtAuto")))b.onchange=function(){wt.auto=this.checked;};
   if((b=el("wtRate")))b.onchange=function(){v.playbackRate=+this.value;};
   if((b=el("wtFull")))b.onclick=function(){var s=el("wtStage");try{if(document.fullscreenElement)document.exitFullscreen();else (s.requestFullscreen||s.webkitRequestFullscreen).call(s);}catch(e){}};
@@ -1212,6 +1250,7 @@ document.addEventListener("keydown",function(e){
   else if(k==="["&&fol){clkSet(wtNow()-0.5);}
   else if(k==="]"&&fol){clkSet(wtNow()+0.5);}
   else if(k==="e"){wt.showEn=!wt.showEn;wt.cur=-2;if((c=el("wtShowEn")))c.checked=wt.showEn;}
+  else if(k==="r"){wt.showRo=!wt.showRo;wt.cur=-2;if((c=el("wtShowRo")))c.checked=wt.showRo;}
   else if(k==="k"){wt.showKo=!wt.showKo;wt.cur=-2;if((c=el("wtShowKo")))c.checked=wt.showKo;}
   else if(k==="p"&&!fol){wt.auto=!wt.auto;if((c=el("wtAuto")))c.checked=wt.auto;}
 });
